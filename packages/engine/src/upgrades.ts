@@ -67,6 +67,24 @@ export function buyUpgrade(owned: Upgrades, wallet: number, kind: UpgradeKind): 
   return { upgrades: { ...owned, [kind]: level + 1 }, wallet: wallet - cost };
 }
 
+/**
+ * How many times a campaign lets the player take back everything bought in the shop and spend it again. Few, so a
+ * purchase is still a decision; some, so a bad one doesn't sink the campaign.
+ */
+export const SHOP_REFUNDS = 2;
+
+/** The coins spent to own `owned`: what a refund gives back, in full. */
+export function upgradesWorth(owned: Upgrades): number {
+  let worth = 0;
+  for (const kind of UPGRADE_KINDS) for (let level = 0; level < owned[kind]; level++) worth += upgradeCost(kind, level);
+  return worth;
+}
+
+/** Every upgrade taken back for what it cost: no upgrades, and the wallet as if nothing had been bought. */
+export function refundUpgrades(owned: Upgrades, wallet: number): { upgrades: Upgrades; wallet: number } {
+  return { upgrades: { ...NO_UPGRADES }, wallet: wallet + upgradesWorth(owned) };
+}
+
 /** The first level that cannot be beaten without visiting the shop. */
 export const SHOP_FROM_LEVEL = 3;
 
