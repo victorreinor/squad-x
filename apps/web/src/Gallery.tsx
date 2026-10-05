@@ -30,12 +30,13 @@ export function Gallery() {
     renderer.outputColorSpace = THREE.SRGBColorSpace;
     el.appendChild(renderer.domElement);
     const scene = new THREE.Scene();
-    scene.background = new THREE.Color(0x9fc6e8);
+    // a deep navy stage, the colour of the game's menus, so the characters stand out in prints
+    scene.background = new THREE.Color(0x16284a);
     scene.add(new THREE.HemisphereLight(0xffffff, 0x6a7a8a, 1.5));
     const sun = new THREE.DirectionalLight(0xfff3d6, 2.2);
     sun.position.set(-6, 14, 8);
     scene.add(sun);
-    const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshToonMaterial({ color: 0x8a8f98 }));
+    const floor = new THREE.Mesh(new THREE.PlaneGeometry(80, 40), new THREE.MeshToonMaterial({ color: 0x16284a }));
     floor.rotation.x = -Math.PI / 2;
     scene.add(floor);
     const ramp = toonRamp();
