@@ -46,7 +46,7 @@ Tudo é original: cada soldado, monstro, arma e som sai de código. Nenhum model
 - **Hordas:** zumbis, velocistas, brutamontes, policiais de choque (o tiro de soldado rende menos neles), homens-bomba (explodem em cadeia) e atiradores (recuam e atiram).
 - **Chefões:** cinco, um por mundo, e cada um luta de um jeito: mísseis, barris explosivos rolando, escudo com laser, gelo com pancada e chuva de meteoros. Ficam parados na pista, visíveis de longe, e a barra de vida no topo mostra quanto falta.
 - **Perigos:** espinhos para desviar, minas para atirar de longe e, a partir da fase 6, um **bombardeiro** que deixa um corredor seguro entre as zonas vermelhas.
-- **Loja:** Dano, Reforços, Resistência e Butim. A campanha inteira é calibrada em volta dela (veja [Dificuldade](#-dificuldade-amarrada-à-loja)).
+- **Loja:** Dano, Reforços, Resistência e Butim. A campanha inteira é calibrada em volta dela (veja [Dificuldade](#-dificuldade-amarrada-à-loja)). Duas vezes na campanha dá para devolver todas as melhorias, receber de volta tudo o que foi gasto e comprar de novo.
 
 ## 👥 O elenco
 
@@ -166,7 +166,7 @@ A tela sempre diz o que você tem (soldados, arma, veículos, melhorias), o que 
 | Som | Sintetizado em tempo real com Web Audio, sem nenhum arquivo de áudio: efeitos em camadas com eco de sala, e uma música para o menu, outra para a fase e outra para o chefão |
 | Instalação | PWA: manifesto e service worker (`vite-plugin-pwa`); depois da primeira visita, joga sem internet |
 | Fases | Geradas por semente e calibradas por simulação (`bun run calibrate`) |
-| Testes | `bun test`: 104 testes, incluindo cada chefão, o equilíbrio das fases com e sem loja e a campanha inteira jogada por bots |
+| Testes | `bun test`: 108 testes, incluindo cada chefão, o equilíbrio das fases com e sem loja e a campanha inteira jogada por bots |
 
 ```mermaid
 flowchart LR

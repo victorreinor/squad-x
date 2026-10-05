@@ -94,7 +94,7 @@ O que é dimensionado **pelo esquadrão medido** (`spec.trace`) e não por um pa
 3. Da fase 3 em diante, se o mesmo bot **sem** melhorias ainda vence 4 de 8, sobe a pressão enquanto o bot com melhorias aguenta um pouco menos, até o de sem melhorias falhar.
 4. As fases 1 e 2 ficam fáceis de propósito e dispensam a loja.
 
-`expectedUpgrades(n)` é o jogador para quem tudo isso é afinado: vence cada fase uma vez com duas estrelas e, da fase 3 em diante, vence de novo uma fase anterior antes de cada nova, gastando tudo na loja. A economia é a de `runPayout`: derrota não paga; a primeira vitória numa fase paga recompensa, estrelas e saque; vencer de novo paga 50%, 25% e depois nada (`REPLAY_SHARES`); estrela nova paga `STAR_COINS` sempre. O progresso guarda quantas vezes cada fase foi vencida (`wins`) e a melhor marca (`stars`). `bun run stress` confere o resultado jogando a campanha inteira, inclusive as voltas a fases antigas de quem trava.
+`expectedUpgrades(n)` é o jogador para quem tudo isso é afinado: vence cada fase uma vez com duas estrelas e, da fase 3 em diante, vence de novo uma fase anterior antes de cada nova, gastando tudo na loja. A economia é a de `runPayout`: derrota não paga; a primeira vitória numa fase paga recompensa, estrelas e saque; vencer de novo paga 50%, 25% e depois nada (`REPLAY_SHARES`); estrela nova paga `STAR_COINS` sempre. O progresso guarda quantas vezes cada fase foi vencida (`wins`) e a melhor marca (`stars`). `refundUpgrades` desfaz todas as compras e devolve o que custaram (`upgradesWorth`), `SHOP_REFUNDS` vezes por campanha; o progresso conta as já usadas (`refunds`). Os bots não devolvem nada, então a calibração não muda. `bun run stress` confere o resultado jogando a campanha inteira, inclusive as voltas a fases antigas de quem trava.
 
 O resultado vai para `pressures.ts`. Um teste recalibra três fases e confere com a tabela.
 
@@ -102,7 +102,7 @@ O resultado vai para `pressures.ts`. Um teste recalibra três fases e confere co
 
 ### Telas
 
-`App.tsx` alterna entre o menu (`Home`, com a legenda dos modos, o mapa e o aviso "você está atrás"), a loja (`screens/Shop.tsx`) e a partida (`game/Game.tsx`). `main.tsx` mostra a galeria no lugar do app quando a URL tem `?galeria=1`, e a arena dos chefões (`BossArena.tsx`) quando tem `?chefao=`.
+`App.tsx` alterna entre o menu (`Home`, com a legenda dos modos, o mapa, o aviso "você está atrás" e o "Recomeçar do zero"), a loja (`screens/Shop.tsx`, com a devolução das melhorias) e a partida (`game/Game.tsx`). O que não dá para desfazer passa por `screens/Confirm.tsx`, a janela que pergunta antes; ela fica ao lado da tela, e não dentro, porque o menu e a loja rolam. `main.tsx` mostra a galeria no lugar do app quando a URL tem `?galeria=1`, e a arena dos chefões (`BossArena.tsx`) quando tem `?chefao=`.
 
 ### Um quadro da partida (`Game.tsx`)
 
