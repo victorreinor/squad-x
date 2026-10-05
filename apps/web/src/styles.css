@@ -65,6 +65,15 @@ h2,
   font-size: 24px;
   padding: 16px 28px;
 }
+/* the one button that destroys something: red, and never the default */
+.btn.danger {
+  background: linear-gradient(#e2554d, #a92a24);
+}
+.btn.small {
+  font-size: 14px;
+  padding: 8px 16px;
+  border-bottom-width: 3px;
+}
 
 /* ---- home ---- */
 .home {
@@ -574,6 +583,11 @@ h2,
   flex-direction: column;
   gap: 10px;
   margin-top: 8px;
+}
+/* "Recomeçar?" over the menu: fixed to the screen, whatever the scroll */
+.overlay.confirm {
+  position: fixed;
+  z-index: 10;
 }
 
 @media (prefers-reduced-motion: reduce) {

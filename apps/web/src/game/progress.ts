@@ -40,6 +40,21 @@ export function loadProgress(): Progress {
   return fresh();
 }
 
+/** Erase the player's progress for good (the menu asks first) and return a fresh one. The sound setting stays. */
+export function resetProgress(): Progress {
+  try {
+    localStorage.removeItem(KEY);
+  } catch {
+    // see loadProgress
+  }
+  return fresh();
+}
+
+/** Whether there is anything to erase: a level won, a coin or an upgrade. */
+export function hasProgress(p: Progress): boolean {
+  return p.unlocked > 1 || p.coins > 0 || Object.values(p.upgrades).some((n) => n > 0);
+}
+
 function save(p: Progress) {
   try {
     localStorage.setItem(KEY, JSON.stringify({ ...p, version: SAVE_VERSION }));
