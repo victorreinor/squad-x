@@ -66,7 +66,7 @@ export function Gallery() {
       WEAPONS.forEach((w, i) => figure(soldierFigure(w), -7.2 + i * 2.2, 1.5, 0, `${w} · costas`));
       WEAPONS.forEach((w, i) => figure(soldierFigure(w), 1.6 + i * 2.2, 1.5, Math.PI, `${w} · frente`));
     } else if (tab === "inimigos") {
-      ENEMIES.forEach((k, i) => figure(ENEMY_LOOKS[k].figure, (i - 2.5) * 2.3, ENEMY_LOOKS[k].scale * 1.25, Math.PI, k));
+      ENEMIES.forEach((k, i) => figure(ENEMY_LOOKS[k].figure(), (i - 2.5) * 2.3, ENEMY_LOOKS[k].scale * 1.25, Math.PI, k));
       spread = 6;
     } else if (tab === "chefoes") {
       BOSS_FIGURES.forEach((b, i) => figure(b.figure(), (i - 2) * 4.2, BOSS_SCALE * 0.62, Math.PI, b.name));

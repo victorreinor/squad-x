@@ -1,9 +1,11 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { BOSS_SLAM_WARN, ENEMY_KINDS, STRIKE_WARN, LANE_HALF_WIDTH, WEAPON_DPS, columnXs, nextRandom, squadColumns, vehicleXs, type Barrel, type EnemyKind, type Gate, type GameState, type Reward, type WeaponKind } from "@squadx/engine";
+import { BOSS_SLAM_WARN, ENEMY_KINDS, STRIKE_WARN, LANE_HALF_WIDTH, WEAPON_DPS, nextRandom, vehicleXs, type Barrel, type EnemyKind, type Gate, type GameState, type Reward, type WeaponKind } from "@squadx/engine";
 import { Crowd, partsToGroup, toonRamp } from "./crowd";
-import { BOSS_FIGURES, BOSS_SCALE, ENEMY_LOOKS, soldierFigure, weaponParts } from "./figures";
+import { BOSS_FIGURES, BOSS_SCALE, ENEMY_LOOKS, runEnemy, runGun, runSoldier, weaponParts } from "./figures";
+import { FAR_BELOW, ROW_SPACING, SQUAD_SHOWN, squadFormation, type Formation } from "./formation";
 import { TextSprite } from "./labels";
+import { sharpness } from "./sharpness";
 import { lookFor } from "./themes";
 import { addBackdrop, addBarriers, addBridge, addWorld, type Dressing } from "./scenery";
 import { bombParts, mineLight, mineParts, planeParts, spikesParts } from "./props";
@@ -12,8 +14,6 @@ import { HOVER, VEHICLE_NAMES, VEHICLE_SHOT, buildVehicle, type VehicleModel } f
 /** The engine runs down +z; the camera looks down -z so +x is on the right. */
 const Z = (z: number) => -z;
 
-/** how many soldiers are drawn at most; the counter above the squad tells the real number */
-const SQUAD_SHOWN = 126;
 const BULLET_CAPACITY = 320;
 const PARTICLE_CAPACITY = 360;
 /** seconds between two bullets of one column */
@@ -120,6 +120,11 @@ export class Scene3D {
   private readonly camera = new THREE.PerspectiveCamera(46, 1, 0.5, 420);
   private readonly ramp = toonRamp();
   private readonly squad: Crowd;
+  /** the same squad once it is big and drawn small: a lighter soldier */
+  private readonly squadFar: Crowd;
+  /** the size and the depth the squad is drawn with, easing towards those of its formation */
+  private squadScale = 1;
+  private squadDepth = 0;
   private readonly enemyCrowds = {} as Record<EnemyKind, Crowd>;
   private readonly enemyFx = new Map<number, EnemyFx>();
   private readonly ghosts: Ghost[] = [];
@@ -156,7 +161,7 @@ export class Scene3D {
   constructor(private readonly host: HTMLElement, state: GameState) {
     const look = lookFor(state.theme);
     this.renderer = new THREE.WebGLRenderer({ antialias: true, powerPreference: "high-performance" });
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+    this.renderer.setPixelRatio(sharpness.start());
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
     host.appendChild(this.renderer.domElement);
     this.renderer.domElement.style.touchAction = "none";
@@ -176,12 +181,13 @@ export class Scene3D {
     this.buildWorld(state, look);
     this.decorate(state, look);
 
-    this.squad = new Crowd(SQUAD_SHOWN, soldierFigure("pistol"), this.ramp);
+    this.squad = new Crowd(SQUAD_SHOWN, runSoldier("pistol"), this.ramp);
+    this.squadFar = new Crowd(SQUAD_SHOWN, runSoldier("pistol", true), this.ramp);
     const world = Math.max(0, ["bridge", "desert", "city", "snow", "volcano"].indexOf(state.theme));
     for (const kind of ENEMY_KINDS) {
-      this.enemyCrowds[kind] = kind === "boss" ? new Crowd(3, BOSS_FIGURES[world].figure(), this.ramp) : new Crowd(ENEMY_LOOKS[kind].capacity, ENEMY_LOOKS[kind].figure, this.ramp);
+      this.enemyCrowds[kind] = kind === "boss" ? new Crowd(3, BOSS_FIGURES[world].figure(), this.ramp) : new Crowd(ENEMY_LOOKS[kind].capacity, runEnemy(kind), this.ramp);
     }
-    for (const crowd of [this.squad, ...Object.values(this.enemyCrowds)]) {
+    for (const crowd of [this.squad, this.squadFar, ...Object.values(this.enemyCrowds)]) {
       this.scene.add(crowd.group);
       this.disposables.push(crowd);
     }
@@ -507,8 +513,15 @@ export class Scene3D {
     const squadX = lerp(prev.squad.x, cur.squad.x, alpha);
     const walking = cur.status === "playing" && cur.distance < cur.length;
 
-    this.placeCamera(squadX, distance, dt, Math.ceil(Math.min(cur.squad.count, SQUAD_SHOWN) / squadColumns(cur.squad.count)));
-    this.drawSquad(cur, squadX, distance, time, walking);
+    // a slow device gets a softer picture rather than a slower run
+    const ratio = sharpness.frame(dt);
+    if (ratio) this.renderer.setPixelRatio(ratio);
+
+    const formation = squadFormation(cur.squad.count);
+    this.squadScale = lerp(this.squadScale, formation.scale, 0.2);
+    this.squadDepth = lerp(this.squadDepth, formation.depth, 0.2);
+    this.placeCamera(squadX, distance, dt);
+    this.drawSquad(cur, formation, squadX, distance, time, walking);
     this.drawEnemies(prev, cur, alpha, time, dt);
     this.drawHazards(cur, distance);
     this.drawPlane(prev, cur, alpha, distance);
@@ -522,7 +535,7 @@ export class Scene3D {
     this.renderer.render(this.scene, this.camera);
   }
 
-  private placeCamera(squadX: number, distance: number, dt: number, rows: number) {
+  private placeCamera(squadX: number, distance: number, dt: number) {
     // far enough back that the whole road (and a margin) fits the width of the screen
     const aspect = this.camera.aspect;
     const tanHalf = Math.tan(THREE.MathUtils.degToRad(this.camera.fov / 2));
@@ -531,33 +544,36 @@ export class Scene3D {
     this.shake = Math.max(0, this.shake - dt * 2.4);
     const jitter = this.shake * this.shake * 0.5;
     // a deep squad stretches behind its front row: back the camera up so the last rows are not cut off
-    const depth = Math.max(0, rows - 4) * 0.78 * 0.55;
+    const depth = Math.max(0, this.squadDepth - 3 * ROW_SPACING) * 0.55;
     this.camera.position.set(squadX * 0.3 + (Math.random() - 0.5) * jitter, Math.sin(elevation) * dist + (Math.random() - 0.5) * jitter + depth * 0.3, Z(distance - depth) + Math.cos(elevation) * dist);
     this.camera.lookAt(squadX * 0.15, 0.4, Z(distance + 7 - depth));
   }
 
-  private drawSquad(cur: GameState, squadX: number, distance: number, time: number, walking: boolean) {
+  private drawSquad(cur: GameState, formation: Formation, squadX: number, distance: number, time: number, walking: boolean) {
     const { count, weapon } = cur.squad;
     if (weapon !== this.lastWeapon) {
-      this.squad.setGun(weaponParts(weapon));
+      this.squad.setGun(runGun(weapon));
+      this.squadFar.setGun(runGun(weapon, true));
       this.lastWeapon = weapon;
     }
     const firing = cur.status === "playing" && cur.volleys.some((v) => !v.vehicle && v.hit);
-    const shown = Math.min(count, SQUAD_SHOWN);
-    const cols = squadColumns(count);
-    const xs = columnXs(squadX, count);
+    const { shown, cols, dx, dz } = formation;
+    const left = squadX - ((cols - 1) * dx) / 2;
+    const crowd = formation.scale < FAR_BELOW ? this.squadFar : this.squad;
     this.squad.begin();
+    this.squadFar.begin();
     for (let k = 0; k < shown; k++) {
       const col = k % cols;
       const row = Math.floor(k / cols);
       // staggered rows read as a crowd instead of a grid
-      const tx = xs[col] + (row % 2 ? 0.25 : 0);
-      const tz = distance - row * 0.78;
+      const tx = left + col * dx + (row % 2 ? dx * 0.36 : 0);
+      const tz = distance - row * dz;
       this.slotX[k] = this.slotX[k] === undefined ? tx : lerp(this.slotX[k], tx, 0.28);
       this.slotZ[k] = this.slotZ[k] === undefined ? tz : lerp(this.slotZ[k], tz, 0.28);
-      this.squad.add(this.slotX[k], Z(this.slotZ[k]), 1, 0, k * 1.7, walking ? time : 0, 0, 0, 0.06, firing ? 0.035 * Math.abs(Math.sin(time * 38 + k)) : 0);
+      crowd.add(this.slotX[k], Z(this.slotZ[k]), this.squadScale, 0, k * 1.7, walking ? time : 0, 0, 0, 0.06, firing ? 0.035 * Math.abs(Math.sin(time * 38 + k)) : 0);
     }
     this.squad.end();
+    this.squadFar.end();
     // a little dust kicked up behind the running squad
     if (walking && Math.random() < 0.35) this.burst(squadX + (Math.random() - 0.5) * 2.4, 0.08, distance - 1.2 - Math.random() * 2, 0xd9d2c0, 1, 0.18);
     this.drawVehicles(cur, squadX, distance, time);
@@ -741,7 +757,9 @@ export class Scene3D {
           this.fireClock[i] -= shot.gap;
           if (this.bullets.length < BULLET_CAPACITY) {
             this.bullets.push({ x: v.x, z: distance + 0.6, endZ: v.z, hit: v.hit, thick: shot.thick, color: shot.color });
-            this.flash(v.x, 0.95, distance + 0.9, v.vehicle ? 0xffb050 : 0xffe9a8, v.vehicle ? 0.9 : 0.5, v.vehicle ? 1.7 : 1, v.vehicle ? 0.1 : 0.06);
+            // the flash sits at the muzzle, which is lower and closer on a squad drawn small
+            const muzzle = v.vehicle ? 1 : this.squadScale;
+            this.flash(v.x, 0.95 * muzzle, distance + 0.9 * muzzle, v.vehicle ? 0xffb050 : 0xffe9a8, v.vehicle ? 0.9 : 0.5, v.vehicle ? 1.7 : 1, v.vehicle ? 0.1 : 0.06);
           }
         }
       });

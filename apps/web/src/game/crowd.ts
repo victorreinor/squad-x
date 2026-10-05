@@ -15,6 +15,8 @@ export interface PartSpec {
   role: Role;
   glow?: boolean;
   ink?: boolean;
+  /** when the piece can be left out: "front" only shows with the figure facing the camera, "fine" is too small to tell on a figure drawn small */
+  skip?: "front" | "fine";
 }
 
 /** How an arm hangs or aims: `base` is the angle it holds (0 down, about 1.2 forward) and `swing` how much it swings. */
@@ -222,18 +224,24 @@ export class Crowd {
     this.shadow.setMatrixAt(i, out.compose(pos.set(x, 0.03, z), noTurn, scl.set(scale, 1, scale)));
   }
 
-  /** Finish the frame: upload what was placed. */
+  /** Finish the frame: upload what was placed, and only that (an empty crowd uploads nothing). */
   end() {
+    if (!this.used && !this.shadow.count) return;
+    const upload = (attribute: THREE.InstancedBufferAttribute) => {
+      attribute.clearUpdateRanges();
+      attribute.addUpdateRange(0, this.used * attribute.itemSize);
+      attribute.needsUpdate = true;
+    };
     for (const layer of this.layers) {
       for (const mesh of [...layer.fills, layer.ink]) {
         if (!mesh) continue;
         mesh.count = this.used;
-        mesh.instanceMatrix.needsUpdate = true;
-        if (mesh.instanceColor) mesh.instanceColor.needsUpdate = true;
+        upload(mesh.instanceMatrix);
+        if (mesh.instanceColor) upload(mesh.instanceColor);
       }
     }
     this.shadow.count = this.used;
-    this.shadow.instanceMatrix.needsUpdate = true;
+    upload(this.shadow.instanceMatrix);
   }
 
   dispose() {

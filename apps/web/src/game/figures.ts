@@ -14,6 +14,7 @@ export interface Opt {
   scale?: V3;
   glow?: boolean;
   ink?: boolean;
+  skip?: PartSpec["skip"];
 }
 
 const M = new THREE.Matrix4();
@@ -27,22 +28,61 @@ function place(geo: THREE.BufferGeometry, at: V3, rot: V3 = [0, 0, 0], scale: V3
   return geo;
 }
 
-const part = (geo: THREE.BufferGeometry, at: V3, color: number, o: Opt): PartSpec => ({ geo: place(geo, at, o.rot, o.scale), color, role: o.role ?? "static", glow: o.glow, ink: o.ink });
+const part = (geo: THREE.BufferGeometry, at: V3, color: number, o: Opt): PartSpec => ({ geo: place(geo, at, o.rot, o.scale), color, role: o.role ?? "static", glow: o.glow, ink: o.ink, skip: o.skip });
+
+/**
+ * How far a round shape may stray from the true curve (body units). 0 keeps the number of sides each shape was written
+ * with, which is what the gallery wants: there a figure fills the screen. In a run a figure is a few dozen pixels
+ * tall, so a shape only needs the sides that keep it within the slack: eyes, hands and spikes get a fraction of the
+ * triangles, while helmets and heads keep nearly all of theirs.
+ */
+let slack = 0;
+
+/** Build figures with their round shapes cut for `value` of slack (see `slack`). */
+export function cut<T>(value: number, build: () => T): T {
+  const before = slack;
+  slack = value;
+  try {
+    return build();
+  } finally {
+    slack = before;
+  }
+}
+
+/** How many sides a round shape of radius `r` gets: the `written` number, or fewer when fewer stay within the slack. */
+function sides(r: number, written: number, least = 5): number {
+  if (!slack) return written;
+  const needed = Math.ceil(Math.PI / Math.acos(Math.max(-1, 1 - slack / r)));
+  return Math.max(Math.min(least, written), Math.min(written, needed));
+}
+
+/** the radius a shape ends up with once `scale` stretches it */
+const stretched = (r: number, o: Opt) => r * Math.max(...(o.scale ?? [1]).map(Math.abs));
+
 /** a box: width, height, depth */
 export const B = (size: V3, at: V3, color: number, o: Opt = {}) => part(new THREE.BoxGeometry(...size), at, color, o);
 /** a sphere, or an egg with `scale` */
-export const S = (r: number, at: V3, color: number, o: Opt = {}) => part(new THREE.SphereGeometry(r, 14, 10), at, color, o);
+export const S = (r: number, at: V3, color: number, o: Opt = {}) => {
+  const around = sides(stretched(r, o), 14);
+  return part(new THREE.SphereGeometry(r, around, Math.max(3, Math.round(around * 0.7))), at, color, o);
+};
 /** a cylinder along y (use `rot` to lay it down): top radius, bottom radius, height */
-export const C = (rt: number, rb: number, h: number, at: V3, color: number, o: Opt = {}) => part(new THREE.CylinderGeometry(rt, rb, h, 12), at, color, o);
+export const C = (rt: number, rb: number, h: number, at: V3, color: number, o: Opt = {}) => part(new THREE.CylinderGeometry(rt, rb, h, sides(stretched(Math.max(rt, rb), o), 12)), at, color, o);
 /** a cone pointing up: radius, height */
-export const K = (r: number, h: number, at: V3, color: number, o: Opt = {}) => part(new THREE.ConeGeometry(r, h, 10), at, color, o);
+export const K = (r: number, h: number, at: V3, color: number, o: Opt = {}) => part(new THREE.ConeGeometry(r, h, sides(stretched(r, o), 10, 4)), at, color, o);
 /** the top of a sphere: helmets, hoods */
-export const H = (r: number, at: V3, color: number, o: Opt = {}) => part(new THREE.SphereGeometry(r, 16, 10, 0, Math.PI * 2, 0, Math.PI * 0.55), at, color, o);
+export const H = (r: number, at: V3, color: number, o: Opt = {}) => {
+  const around = sides(stretched(r, o), 16);
+  return part(new THREE.SphereGeometry(r, around, Math.max(3, Math.round(around * 0.6)), 0, Math.PI * 2, 0, Math.PI * 0.55), at, color, o);
+};
 /** a capsule: torsos */
-export const CAP = (r: number, len: number, at: V3, color: number, o: Opt = {}) => part(new THREE.CapsuleGeometry(r, len, 4, 10), at, color, o);
+export const CAP = (r: number, len: number, at: V3, color: number, o: Opt = {}) => {
+  const around = sides(stretched(r, o), 10);
+  return part(new THREE.CapsuleGeometry(r, len, Math.max(2, Math.round(around * 0.4)), around), at, color, o);
+};
 
 /** a torus lying with its hole along x (a wheel seen from the side): ring radius, tube radius */
-export const T = (r: number, tube: number, at: V3, color: number, o: Opt = {}) => part(new THREE.TorusGeometry(r, tube, 10, 20), at, color, { ...o, rot: o.rot ?? [0, Math.PI / 2, 0] });
+export const T = (r: number, tube: number, at: V3, color: number, o: Opt = {}) => part(new THREE.TorusGeometry(r, tube, sides(tube, 10), sides(r, 20, 8)), at, color, { ...o, rot: o.rot ?? [0, Math.PI / 2, 0] });
 
 export const PI = Math.PI;
 /** a cylinder lying along z, pointing at the enemy */
@@ -63,7 +103,7 @@ export function weaponParts(weapon: WeaponKind): PartSpec[] {
       B([0.05, 0.065, 0.22], [0.04, 0.9, -0.42], steel, g),
       B([0.045, 0.12, 0.06], [0.04, 0.83, -0.35], 0x3a3f4c, { ...g, rot: [-0.25, 0, 0] }),
       C(0.016, 0.016, 0.1, [0.04, 0.9, -0.58], 0x1a1c22, { ...g, rot: alongZ }),
-      S(0.06, [0.04, 0.86, -0.36], hand, g),
+      S(0.06, [0.04, 0.86, -0.36], hand, { ...g, skip: "fine" }),
     ];
   }
   if (weapon === "smg") {
@@ -73,8 +113,8 @@ export function weaponParts(weapon: WeaponKind): PartSpec[] {
       C(0.022, 0.022, 0.26, [0.04, 0.91, -0.64], steel, { ...g, rot: alongZ }),
       C(0.04, 0.04, 0.2, [0.04, 0.91, -0.78], 0x1a1c22, { ...g, rot: alongZ }),
       B([0.05, 0.05, 0.2], [0.04, 0.9, -0.1], steel, g),
-      B([0.05, 0.08, 0.05], [0.04, 0.83, -0.28], steel, g),
-      S(0.06, [0.04, 0.84, -0.3], hand, g),
+      B([0.05, 0.08, 0.05], [0.04, 0.83, -0.28], steel, { ...g, skip: "fine" }),
+      S(0.06, [0.04, 0.84, -0.3], hand, { ...g, skip: "fine" }),
     ];
   }
   if (weapon === "minigun") {
@@ -89,8 +129,8 @@ export function weaponParts(weapon: WeaponKind): PartSpec[] {
       C(0.075, 0.075, 0.04, [0.04, 0.92, -1.0], 0xd8a420, { ...g, rot: alongZ }),
       ...barrels,
       B([0.16, 0.16, 0.16], [0.04, 0.76, -0.3], 0xd8a420, g),
-      B([0.04, 0.12, 0.05], [0.04, 0.82, -0.12], steel, g),
-      S(0.06, [0.04, 0.84, -0.3], hand, g),
+      B([0.04, 0.12, 0.05], [0.04, 0.82, -0.12], steel, { ...g, skip: "fine" }),
+      S(0.06, [0.04, 0.84, -0.3], hand, { ...g, skip: "fine" }),
     ];
   }
   // rifle
@@ -100,8 +140,8 @@ export function weaponParts(weapon: WeaponKind): PartSpec[] {
     B([0.08, 0.09, 0.22], [0.04, 0.9, -0.58], wood, g),
     B([0.07, 0.14, 0.22], [0.04, 0.86, -0.06], wood, g),
     B([0.05, 0.17, 0.07], [0.04, 0.78, -0.36], steel, { ...g, rot: [0.3, 0, 0] }),
-    B([0.03, 0.05, 0.03], [0.04, 0.97, -0.52], 0x1a1c22, g),
-    S(0.06, [0.04, 0.85, -0.52], hand, g),
+    B([0.03, 0.05, 0.03], [0.04, 0.97, -0.52], 0x1a1c22, { ...g, skip: "fine" }),
+    S(0.06, [0.04, 0.85, -0.52], hand, { ...g, skip: "fine" }),
   ];
 }
 
@@ -138,7 +178,7 @@ function arms(sleeve: number, skin: number, w = 1, long = 1): PartSpec[] {
   const parts: PartSpec[] = [];
   for (const [role, x] of [["armL", -0.27], ["armR", 0.27]] as const) {
     parts.push(B([0.11 * w, 0.32 * long, 0.11 * w], [x, 1 - 0.18 * long, 0], sleeve, { role }));
-    parts.push(S(0.07 * w, [x, 1 - 0.38 * long, 0], skin, { role }));
+    parts.push(S(0.07 * w, [x, 1 - 0.38 * long, 0], skin, { role, skip: "fine" }));
   }
   return parts;
 }
@@ -154,52 +194,68 @@ export function soldierFigure(weapon: WeaponKind = "pistol"): FigureSpec {
   const parts: PartSpec[] = [
     ...legs(0x4b6b34, 0x2b2622),
     // knee pads
-    B([0.15, 0.1, 0.06], [-0.1, 0.38, -0.11], plates, { role: "legL" }),
-    B([0.15, 0.1, 0.06], [0.1, 0.38, -0.11], plates, { role: "legR" }),
+    B([0.15, 0.1, 0.06], [-0.1, 0.38, -0.11], plates, { role: "legL", skip: "front" }),
+    B([0.15, 0.1, 0.06], [0.1, 0.38, -0.11], plates, { role: "legR", skip: "front" }),
     // torso: vest, plates front and back, belt and pouches
     CAP(0.23, 0.2, [0, 0.8, 0], vest),
-    B([0.36, 0.3, 0.1], [0, 0.84, -0.2], plates),
-    B([0.34, 0.3, 0.06], [0, 0.84, 0.23], plates),
+    B([0.36, 0.3, 0.1], [0, 0.84, -0.2], plates, { skip: "front" }),
+    B([0.34, 0.3, 0.06], [0, 0.84, 0.23], plates, { skip: "fine" }),
     B([0.52, 0.08, 0.34], [0, 0.56, 0], 0x2d2a22),
-    B([0.1, 0.12, 0.08], [-0.17, 0.54, -0.19], pack),
-    B([0.1, 0.12, 0.08], [0.17, 0.54, -0.19], pack),
+    B([0.1, 0.12, 0.08], [-0.17, 0.54, -0.19], pack, { skip: "front" }),
+    B([0.1, 0.12, 0.08], [0.17, 0.54, -0.19], pack, { skip: "front" }),
     // backpack with a rolled mat on top: the soldier's signature from behind
     B([0.34, 0.42, 0.22], [0, 0.82, 0.34], pack),
     C(0.1, 0.1, 0.44, [0, 1.1, 0.34], 0x6f6d4a, { rot: [0, 0, PI / 2] }),
     B([0.2, 0.15, 0.08], [0, 0.7, 0.48], plates),
     // a canteen and a shovel strapped to the pack
-    C(0.07, 0.07, 0.16, [0.19, 0.7, 0.4], 0x3d5a8a, { rot: [0, 0, PI / 2] }),
-    C(0.02, 0.02, 0.5, [-0.2, 0.8, 0.46], 0x6a4a2a),
-    B([0.12, 0.14, 0.03], [-0.2, 0.52, 0.46], 0x8a8f98),
+    C(0.07, 0.07, 0.16, [0.19, 0.7, 0.4], 0x3d5a8a, { rot: [0, 0, PI / 2], skip: "fine" }),
+    C(0.02, 0.02, 0.5, [-0.2, 0.8, 0.46], 0x6a4a2a, { skip: "fine" }),
+    B([0.12, 0.14, 0.03], [-0.2, 0.52, 0.46], 0x8a8f98, { skip: "fine" }),
     S(0.13, [-0.27, 1, 0], vest),
     S(0.13, [0.27, 1, 0], vest),
     // head and a big helmet with a brim
-    C(0.08, 0.09, 0.1, [0, 1.03, 0], skin),
+    C(0.08, 0.09, 0.1, [0, 1.03, 0], skin, { skip: "fine" }),
     S(0.2, [0, 1.15, 0], skin),
     // a determined face for when the soldier is seen from the front
-    S(0.03, [-0.075, 1.15, -0.19], 0x1b1b2a, { ink: false }),
-    S(0.03, [0.075, 1.15, -0.19], 0x1b1b2a, { ink: false }),
-    B([0.08, 0.02, 0.03], [-0.075, 1.2, -0.19], 0x3a2a1a, { rot: [0, 0, -0.25], ink: false }),
-    B([0.08, 0.02, 0.03], [0.075, 1.2, -0.19], 0x3a2a1a, { rot: [0, 0, 0.25], ink: false }),
-    B([0.07, 0.02, 0.03], [0, 1.08, -0.19], 0x8a3a2a, { ink: false }),
+    S(0.03, [-0.075, 1.15, -0.19], 0x1b1b2a, { ink: false, skip: "front" }),
+    S(0.03, [0.075, 1.15, -0.19], 0x1b1b2a, { ink: false, skip: "front" }),
+    B([0.08, 0.02, 0.03], [-0.075, 1.2, -0.19], 0x3a2a1a, { rot: [0, 0, -0.25], ink: false, skip: "front" }),
+    B([0.08, 0.02, 0.03], [0.075, 1.2, -0.19], 0x3a2a1a, { rot: [0, 0, 0.25], ink: false, skip: "front" }),
+    B([0.07, 0.02, 0.03], [0, 1.08, -0.19], 0x8a3a2a, { ink: false, skip: "front" }),
     H(0.29, [0, 1.17, 0], 0x4a7a32),
     C(0.31, 0.31, 0.04, [0, 1.13, 0], 0x35582a),
-    S(0.07, [0.14, 1.31, 0.12], 0x3a6228, { scale: [1, 0.5, 1] }),
-    S(0.07, [-0.12, 1.33, 0.02], 0x5f8f42, { scale: [1, 0.5, 1] }),
-    S(0.06, [0.0, 1.38, -0.1], 0x3a6228, { scale: [1, 0.5, 1] }),
-    S(0.05, [-0.02, 1.28, 0.2], 0x6a9a4a, { scale: [1, 0.5, 1] }),
-    B([0.07, 0.02, 0.04], [0.0, 1.43, 0.0], 0xd8c04a),
+    S(0.07, [0.14, 1.31, 0.12], 0x3a6228, { scale: [1, 0.5, 1], skip: "fine" }),
+    S(0.07, [-0.12, 1.33, 0.02], 0x5f8f42, { scale: [1, 0.5, 1], skip: "fine" }),
+    S(0.06, [0.0, 1.38, -0.1], 0x3a6228, { scale: [1, 0.5, 1], skip: "fine" }),
+    S(0.05, [-0.02, 1.28, 0.2], 0x6a9a4a, { scale: [1, 0.5, 1], skip: "fine" }),
+    B([0.07, 0.02, 0.04], [0.0, 1.43, 0.0], 0xd8c04a, { skip: "fine" }),
     ...arms(vest, skin),
     ...weaponParts(weapon),
   ];
   return { parts, pivots: PIVOTS, legSwing: 0.95, armL: { base: 1.0, swing: 0.08 }, armR: { base: 1.12, swing: 0.08 }, kick: 0.03 };
 }
 
+/** the slack of a figure drawn at the size of a run, and of the squad once it is drawn small (body units) */
+const RUN_SLACK = 0.006;
+const FAR_SLACK = 0.02;
+
+/** The pieces a run draws: never the ones only seen from the front (the squad runs away from the camera), and, with `far`, not the fine ones either. */
+const seenInRun = (parts: PartSpec[], far: boolean) => parts.filter((p) => p.skip !== "front" && !(far && p.skip === "fine"));
+
+/** The soldier as a run draws it. `far` is the light version for a big squad, whose soldiers are drawn small. */
+export function runSoldier(weapon: WeaponKind, far = false): FigureSpec {
+  const figure = cut(far ? FAR_SLACK : RUN_SLACK, () => soldierFigure(weapon));
+  return { ...figure, parts: seenInRun(figure.parts, far) };
+}
+
+/** The weapon as a run draws it in the squad's hands (see `runSoldier`). */
+export const runGun = (weapon: WeaponKind, far = false): PartSpec[] => seenInRun(cut(far ? FAR_SLACK : RUN_SLACK, () => weaponParts(weapon)), far);
+
 // ------------------------------------------------------------------ the enemies
 
 /** What each enemy looks like and how big it is drawn. */
 export interface EnemyLook {
-  figure: FigureSpec;
+  figure: () => FigureSpec;
   scale: number;
   /** how far it leans into the run (radians) */
   lean: number;
@@ -368,13 +424,16 @@ function shooterFigure(): FigureSpec {
 
 /** Every enemy but the boss: how it looks, how big it is and how far it leans into the run. */
 export const ENEMY_LOOKS: Record<Exclude<EnemyKind, "boss">, EnemyLook> = {
-  runner: { figure: runnerFigure(), scale: 1, lean: 0.18, capacity: 200 },
-  sprinter: { figure: sprinterFigure(), scale: 0.95, lean: 0.55, capacity: 140 },
-  brute: { figure: bruteFigure(), scale: 1.5, lean: 0.06, capacity: 50 },
-  shield: { figure: shieldFigure(), scale: 1.2, lean: 0, capacity: 50 },
-  bomber: { figure: bomberFigure(), scale: 1.05, lean: 0.25, capacity: 50 },
-  shooter: { figure: shooterFigure(), scale: 1.1, lean: 0, capacity: 30 },
+  runner: { figure: runnerFigure, scale: 1, lean: 0.18, capacity: 200 },
+  sprinter: { figure: sprinterFigure, scale: 0.95, lean: 0.55, capacity: 140 },
+  brute: { figure: bruteFigure, scale: 1.5, lean: 0.06, capacity: 50 },
+  shield: { figure: shieldFigure, scale: 1.2, lean: 0, capacity: 50 },
+  bomber: { figure: bomberFigure, scale: 1.05, lean: 0.25, capacity: 50 },
+  shooter: { figure: shooterFigure, scale: 1.1, lean: 0, capacity: 30 },
 };
+
+/** An enemy as a run draws it: the bigger it is drawn, the less slack its round shapes get. */
+export const runEnemy = (kind: Exclude<EnemyKind, "boss">): FigureSpec => cut(RUN_SLACK / ENEMY_LOOKS[kind].scale, ENEMY_LOOKS[kind].figure);
 
 // ------------------------------------------------------------------ the bosses
 
