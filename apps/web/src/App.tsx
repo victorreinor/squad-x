@@ -3,7 +3,8 @@ import { LEVELS_PER_WORLD, LEVEL_MODES, SHOP_FROM_LEVEL, campaignSpec, expectedU
 import { audio } from "./game/audio";
 import { Counter } from "./game/hud";
 import { Game, type RunResult } from "./game/Game";
-import { hasProgress, loadProgress, purchase, recordRun, resetProgress, startedOver } from "./game/progress";
+import { hasProgress, loadProgress, purchase, recordRun, refund, resetProgress, startedOver } from "./game/progress";
+import { Confirm } from "./screens/Confirm";
 import { Shop } from "./screens/Shop";
 import { MODE_INFO } from "./game/modes";
 import { lookFor } from "./game/themes";
@@ -32,7 +33,7 @@ export function App() {
   const onFinish = (r: RunResult) => setProgress((p) => recordRun(p, r.level, r.stars, r.coins));
 
   if (run) return <Game key={run.id} level={run.level} upgrades={progress.upgrades} record={{ wins: progress.wins[run.level] ?? 0, best: progress.stars[run.level] ?? 0 }} onFinish={onFinish} onPlay={play} onShop={() => { setRun(null); setShop(true); }} onExit={() => setRun(null)} />;
-  if (shop) return <Shop progress={progress} onBuy={(kind) => setProgress((p) => purchase(p, kind))} onBack={() => setShop(false)} />;
+  if (shop) return <Shop progress={progress} onBuy={(kind) => setProgress((p) => purchase(p, kind))} onRefund={() => setProgress(refund)} onBack={() => setShop(false)} />;
   return <Home progress={progress} onPlay={play} onShop={() => setShop(true)} onReset={() => setProgress(resetProgress())} />;
 }
 
@@ -149,43 +150,19 @@ function Home({ progress, onPlay, onShop, onReset }: { progress: ReturnType<type
           </button>
         )}
       </main>
-      {/* outside the menu, which scrolls and animates: inside it the overlay would cover the top of the page, not the screen */}
       {confirming && (
-        <ConfirmReset
+        <Confirm
+          title="Recomeçar?"
+          action="Apagar tudo"
           onCancel={() => setConfirming(false)}
           onConfirm={() => {
             setConfirming(false);
             onReset();
           }}
-        />
+        >
+          Isso apaga as fases vencidas, as estrelas, as moedas e as melhorias da loja, e o jogo volta para a fase 1. Não dá para desfazer.
+        </Confirm>
       )}
     </>
-  );
-}
-
-/** Asks before erasing the progress: it can't be undone. Cancel is the button under the thumb and the default. */
-function ConfirmReset({ onCancel, onConfirm }: { onCancel: () => void; onConfirm: () => void }) {
-  useEffect(() => {
-    const close = (e: KeyboardEvent) => e.key === "Escape" && onCancel();
-    window.addEventListener("keydown", close);
-    return () => window.removeEventListener("keydown", close);
-  }, [onCancel]);
-  return (
-    <div className="overlay confirm" onClick={onCancel}>
-      <div className="card" role="alertdialog" aria-modal="true" aria-labelledby="reset-title" aria-describedby="reset-text" onClick={(e) => e.stopPropagation()}>
-        <h2 id="reset-title" className="lose">
-          Recomeçar?
-        </h2>
-        <p id="reset-text">Isso apaga as fases vencidas, as estrelas, as moedas e as melhorias da loja, e o jogo volta para a fase 1. Não dá para desfazer.</p>
-        <div className="actions">
-          <button className="btn danger" onClick={onConfirm}>
-            Apagar tudo
-          </button>
-          <button className="btn primary" autoFocus onClick={onCancel}>
-            Cancelar
-          </button>
-        </div>
-      </div>
-    </div>
   );
 }

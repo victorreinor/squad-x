@@ -1,4 +1,4 @@
-import { NO_UPGRADES, buyUpgrade, runPayout, type UpgradeKind, type Upgrades } from "@squadx/engine";
+import { NO_UPGRADES, SHOP_REFUNDS, buyUpgrade, refundUpgrades, runPayout, upgradesWorth, type UpgradeKind, type Upgrades } from "@squadx/engine";
 
 /** What the player has earned, kept in the browser. */
 export interface Progress {
@@ -11,6 +11,8 @@ export interface Progress {
   coins: number;
   /** levels bought in the shop */
   upgrades: Upgrades;
+  /** how many of the `SHOP_REFUNDS` the player has used */
+  refunds: number;
 }
 
 const KEY = "squad-x:progress";
@@ -20,7 +22,7 @@ const KEY = "squad-x:progress";
  * it had no version. The sound setting is kept apart and survives.
  */
 const SAVE_VERSION = 2;
-const fresh = (): Progress => ({ unlocked: 1, stars: {}, wins: {}, coins: 0, upgrades: { ...NO_UPGRADES } });
+const fresh = (): Progress => ({ unlocked: 1, stars: {}, wins: {}, coins: 0, upgrades: { ...NO_UPGRADES }, refunds: 0 });
 
 /** Whether this device had a save from an older version, wiped when the game started: the menu says so once. */
 export let startedOver = false;
@@ -52,7 +54,7 @@ export function resetProgress(): Progress {
 
 /** Whether there is anything to erase: a level won, a coin or an upgrade. */
 export function hasProgress(p: Progress): boolean {
-  return p.unlocked > 1 || p.coins > 0 || Object.values(p.upgrades).some((n) => n > 0);
+  return p.unlocked > 1 || p.coins > 0 || p.refunds > 0 || upgradesWorth(p.upgrades) > 0;
 }
 
 function save(p: Progress) {
@@ -66,11 +68,11 @@ function save(p: Progress) {
 /** Record a finished run and return the new progress. */
 export function recordRun(p: Progress, level: number, stars: number, coins: number): Progress {
   const next: Progress = {
+    ...p,
     unlocked: stars > 0 ? Math.max(p.unlocked, level + 1) : p.unlocked,
     stars: { ...p.stars, [level]: Math.max(p.stars[level] ?? 0, stars) },
     wins: stars > 0 ? { ...p.wins, [level]: (p.wins[level] ?? 0) + 1 } : p.wins,
     coins: p.coins + runPayout(coins, stars, p.upgrades, level, p.wins[level] ?? 0, p.stars[level] ?? 0),
-    upgrades: p.upgrades,
   };
   save(next);
   return next;
@@ -81,6 +83,15 @@ export function purchase(p: Progress, kind: UpgradeKind): Progress {
   const bought = buyUpgrade(p.upgrades, p.coins, kind);
   if (!bought) return p;
   const next: Progress = { ...p, upgrades: bought.upgrades, coins: bought.wallet };
+  save(next);
+  return next;
+}
+
+/** Take every upgrade back for what it cost, using one of the `SHOP_REFUNDS`; unchanged when none is left or nothing was bought. */
+export function refund(p: Progress): Progress {
+  if (p.refunds >= SHOP_REFUNDS || upgradesWorth(p.upgrades) === 0) return p;
+  const back = refundUpgrades(p.upgrades, p.coins);
+  const next: Progress = { ...p, upgrades: back.upgrades, coins: back.wallet, refunds: p.refunds + 1 };
   save(next);
   return next;
 }
