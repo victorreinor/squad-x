@@ -1,4 +1,4 @@
-import { NO_UPGRADES, SHOP_REFUNDS, buyUpgrade, refundUpgrades, runPayout, upgradesWorth, type UpgradeKind, type Upgrades } from "@squadx/engine";
+import { NO_UPGRADES, SHOP_REFUNDS, buyUpgrade, refundUpgrades, refundValue, runPayout, type UpgradeKind, type Upgrades } from "@squadx/engine";
 
 /** What the player has earned, kept in the browser. */
 export interface Progress {
@@ -54,7 +54,7 @@ export function resetProgress(): Progress {
 
 /** Whether there is anything to erase: a level won, a coin or an upgrade. */
 export function hasProgress(p: Progress): boolean {
-  return p.unlocked > 1 || p.coins > 0 || p.refunds > 0 || upgradesWorth(p.upgrades) > 0;
+  return p.unlocked > 1 || p.coins > 0 || p.refunds > 0 || Object.values(p.upgrades).some((level) => level > 0);
 }
 
 function save(p: Progress) {
@@ -87,9 +87,9 @@ export function purchase(p: Progress, kind: UpgradeKind): Progress {
   return next;
 }
 
-/** Take every upgrade back for what it cost, using one of the `SHOP_REFUNDS`; unchanged when none is left or nothing was bought. */
+/** Take the refundable upgrades back for what they cost, using one of the `SHOP_REFUNDS`; unchanged when none is left or there is nothing to take back. */
 export function refund(p: Progress): Progress {
-  if (p.refunds >= SHOP_REFUNDS || upgradesWorth(p.upgrades) === 0) return p;
+  if (p.refunds >= SHOP_REFUNDS || refundValue(p.upgrades) === 0) return p;
   const back = refundUpgrades(p.upgrades, p.coins);
   const next: Progress = { ...p, upgrades: back.upgrades, coins: back.wallet, refunds: p.refunds + 1 };
   save(next);

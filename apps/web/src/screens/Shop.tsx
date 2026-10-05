@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Counter } from "../game/hud";
-import { ARMOR_PER_LEVEL, COINS_PER_LEVEL, DAMAGE_PER_LEVEL, SHOP_REFUNDS, SQUAD_PER_LEVEL, UPGRADE_KINDS, UPGRADE_MAX_LEVEL, upgradeCost, upgradesWorth, type UpgradeKind } from "@squadx/engine";
+import { ARMOR_PER_LEVEL, COINS_PER_LEVEL, DAMAGE_PER_LEVEL, REFUNDABLE, SHOP_REFUNDS, SQUAD_PER_LEVEL, UPGRADE_KINDS, UPGRADE_MAX_LEVEL, refundValue, upgradeCost, type UpgradeKind } from "@squadx/engine";
 import type { Progress } from "../game/progress";
 import { UPGRADE_LABEL } from "../game/names";
 import { Confirm } from "./Confirm";
@@ -13,10 +13,15 @@ const INFO: Record<UpgradeKind, { name: string; icon: string; effect: (level: nu
   coins: { ...UPGRADE_LABEL.coins, effect: (l) => `+${Math.round(COINS_PER_LEVEL * l * 100)}% de moedas por fase` },
 };
 
-/** The shop: spend coins on permanent upgrades, and take them all back, `SHOP_REFUNDS` times a campaign. */
+/** "Dano, Reforços e Resistência": the upgrades a refund takes back, as the shop names them. */
+const REFUNDED = REFUNDABLE.map((kind) => INFO[kind].name).join(", ").replace(/, ([^,]*)$/, " e $1");
+/** The upgrades a refund leaves bought, named for the note under the button. */
+const KEPT = UPGRADE_KINDS.filter((kind) => !REFUNDABLE.includes(kind)).map((kind) => INFO[kind].name);
+
+/** The shop: spend coins on permanent upgrades, and take most of them back, `SHOP_REFUNDS` times a campaign. */
 export function Shop({ progress, onBuy, onRefund, onBack }: { progress: Progress; onBuy: (kind: UpgradeKind) => void; onRefund: () => void; onBack: () => void }) {
   const [asking, setAsking] = useState(false);
-  const worth = upgradesWorth(progress.upgrades);
+  const worth = refundValue(progress.upgrades);
   const left = SHOP_REFUNDS - progress.refunds;
   const plural = (n: number) => (n === 1 ? "1 devolução" : `${n} devoluções`);
   return (
@@ -66,12 +71,16 @@ export function Shop({ progress, onBuy, onRefund, onBack }: { progress: Progress
           <button className="btn ghost small" disabled={worth === 0 || left === 0} onClick={() => setAsking(true)}>
             ↺ Devolver melhorias{worth > 0 && left > 0 ? ` · 🪙 ${worth}` : ""}
           </button>
-          <span>{left > 0 ? `Todas as moedas gastas voltam para você comprar de novo. ${left === 1 ? "Resta" : "Restam"} ${plural(left)} no jogo.` : `Você já usou as ${plural(SHOP_REFUNDS)}.`}</span>
+          <span>
+            {left > 0
+              ? `O que você gastou em ${REFUNDED} volta para comprar de novo; o ${KEPT.join(" e o ")} fica. ${left === 1 ? "Resta" : "Restam"} ${plural(left)} no jogo.`
+              : `Você já usou as ${plural(SHOP_REFUNDS)}.`}
+          </span>
         </section>
       </main>
       {asking && (
         <Confirm
-          title="Devolver tudo?"
+          title="Devolver melhorias?"
           action={`Devolver 🪙 ${worth}`}
           onCancel={() => setAsking(false)}
           onConfirm={() => {
@@ -79,7 +88,7 @@ export function Shop({ progress, onBuy, onRefund, onBack }: { progress: Progress
             onRefund();
           }}
         >
-          Todas as melhorias voltam para o nível 0 e as 🪙 {worth} gastas nelas voltam para a carteira, para você comprar de novo como quiser.{" "}
+          {REFUNDED} voltam para o nível 0 e as 🪙 {worth} gastas nelas voltam para a carteira, para você comprar de novo como quiser. O {KEPT.join(" e o ")} continua como está.{" "}
           {left === 1 ? "Esta é a sua última devolução." : `Depois desta, ${left - 1 === 1 ? "resta" : "restam"} ${plural(left - 1)}.`}
         </Confirm>
       )}
