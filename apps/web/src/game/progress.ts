@@ -6,20 +6,33 @@ export interface Progress {
   unlocked: number;
   /** best stars per level number */
   stars: Record<number, number>;
+  /** how many times each level was won: a level pays less every time it is won again */
+  wins: Record<number, number>;
   coins: number;
   /** levels bought in the shop */
   upgrades: Upgrades;
 }
 
 const KEY = "squad-x:progress";
-const fresh = (): Progress => ({ unlocked: 1, stars: {}, coins: 0, upgrades: { ...NO_UPGRADES } });
+/**
+ * The version of the saves this game reads. Raising it wipes everyone's progress the next time they open the game,
+ * for a change that makes old progress meaningless. 2: every boss with its own attack (05/10/2026); the saves before
+ * it had no version. The sound setting is kept apart and survives.
+ */
+const SAVE_VERSION = 2;
+const fresh = (): Progress => ({ unlocked: 1, stars: {}, wins: {}, coins: 0, upgrades: { ...NO_UPGRADES } });
+
+/** Whether this device had a save from an older version, wiped when the game started: the menu says so once. */
+export let startedOver = false;
 
 export function loadProgress(): Progress {
   try {
     const raw = localStorage.getItem(KEY);
     if (raw) {
-      const saved = JSON.parse(raw);
-      return { ...fresh(), ...saved, upgrades: { ...NO_UPGRADES, ...saved.upgrades } };
+      const { version, ...saved } = JSON.parse(raw);
+      if (version === SAVE_VERSION) return { ...fresh(), ...saved, upgrades: { ...NO_UPGRADES, ...saved.upgrades } };
+      localStorage.removeItem(KEY);
+      startedOver = true;
     }
   } catch {
     // private window or blocked storage: play without saving
@@ -29,7 +42,7 @@ export function loadProgress(): Progress {
 
 function save(p: Progress) {
   try {
-    localStorage.setItem(KEY, JSON.stringify(p));
+    localStorage.setItem(KEY, JSON.stringify({ ...p, version: SAVE_VERSION }));
   } catch {
     // see loadProgress
   }
@@ -40,7 +53,8 @@ export function recordRun(p: Progress, level: number, stars: number, coins: numb
   const next: Progress = {
     unlocked: stars > 0 ? Math.max(p.unlocked, level + 1) : p.unlocked,
     stars: { ...p.stars, [level]: Math.max(p.stars[level] ?? 0, stars) },
-    coins: p.coins + runPayout(coins, stars, p.upgrades, level),
+    wins: stars > 0 ? { ...p.wins, [level]: (p.wins[level] ?? 0) + 1 } : p.wins,
+    coins: p.coins + runPayout(coins, stars, p.upgrades, level, p.wins[level] ?? 0, p.stars[level] ?? 0),
     upgrades: p.upgrades,
   };
   save(next);

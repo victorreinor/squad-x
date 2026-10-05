@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import * as THREE from "three";
-import type { EnemyKind, WeaponKind } from "@squadx/engine";
+import { BOSS_KINDS, type EnemyKind, type WeaponKind } from "@squadx/engine";
 import { Crowd, partsToGroup, toonRamp } from "./game/crowd";
 import { BOSS_FIGURES, BOSS_SCALE, ENEMY_LOOKS, soldierFigure, weaponParts } from "./game/figures";
 import { TextSprite } from "./game/labels";
-import { bombParts, mineParts, planeParts, spikesParts } from "./game/props";
+import { KEG_AXLE, bombParts, kegParts, meteorParts, mineParts, missileParts, planeParts, spikesParts } from "./game/props";
 import { buildVehicle } from "./game/vehicles";
 
 const TABS = ["soldado", "inimigos", "chefoes", "armas", "veiculos", "perigos"] as const;
@@ -69,7 +69,7 @@ export function Gallery() {
       ENEMIES.forEach((k, i) => figure(ENEMY_LOOKS[k].figure(), (i - 2.5) * 2.3, ENEMY_LOOKS[k].scale * 1.25, Math.PI, k));
       spread = 6;
     } else if (tab === "chefoes") {
-      BOSS_FIGURES.forEach((b, i) => figure(b.figure(), (i - 2) * 4.2, BOSS_SCALE * 0.62, Math.PI, b.name));
+      BOSS_KINDS.forEach((kind, i) => figure(BOSS_FIGURES[kind].figure(), (i - 2) * 4.2, BOSS_SCALE * 0.62, Math.PI, BOSS_FIGURES[kind].name));
       spread = 10;
     } else if (tab === "armas") {
       WEAPONS.forEach((w, i) => {
@@ -88,24 +88,28 @@ export function Gallery() {
       spread = 12;
       stagedTall = 3;
     } else if (tab === "perigos") {
-      const props: [string, ReturnType<typeof spikesParts>, number, number][] = [
-        ["espinhos", spikesParts(), 1.5, 1.4],
-        ["mina", mineParts(), 2.4, 1],
-        ["bombardeiro", planeParts(), 0.55, 3.6],
-        ["bomba", bombParts(), 3.2, 0.4],
+      // [name, parts, scale, height off the floor, turn about y, turn about z]: the traps and the air strike, then what the bosses throw
+      const props: [string, ReturnType<typeof spikesParts>, number, number, number, number][] = [
+        ["espinhos", spikesParts(), 1.5, 0, Math.PI * 0.8, 0],
+        ["mina", mineParts(), 2.4, 0, Math.PI * 0.8, 0],
+        ["bombardeiro", planeParts(), 0.55, 0.6, Math.PI * 0.75, 0],
+        ["bomba", bombParts(), 3.2, 2.2, 0, Math.PI],
+        ["míssil", missileParts(), 1.8, 1.4, Math.PI * 0.8, 0],
+        ["barril explosivo", kegParts(), 1.6, KEG_AXLE * 1.6, Math.PI * 0.8, 0],
+        ["meteoro", meteorParts(), 1.6, 0.2, Math.PI * 0.8, 0],
       ];
-      props.forEach(([name, parts, scale, lift], i) => {
+      const gap = 3.6;
+      props.forEach(([name, parts, scale, lift, turnY, turnZ], i) => {
         const g = partsToGroup(parts, ramp);
+        const x = (i - (props.length - 1) / 2) * gap;
         g.scale.setScalar(scale);
-        g.position.set((i - 1.5) * 4.2, name === "bombardeiro" ? 0.6 : name === "bomba" ? 2.2 : 0, 0);
-        g.rotation.y = name === "bombardeiro" ? Math.PI * 0.75 : name === "bomba" ? 0 : Math.PI * 0.8;
-        if (name === "bomba") g.rotation.z = Math.PI;
+        g.position.set(x, lift, 0);
+        g.rotation.set(0, turnY, turnZ);
         staged.add(g);
         holders.push(g);
-        label(name, (i - 1.5) * 4.2, -0.4);
-        void lift;
+        label(name, x, -0.4);
       });
-      spread = 17;
+      spread = 26;
       stagedTall = 4;
     } else {
       (["moto", "heli", "tank"] as const).forEach((k, i) => {

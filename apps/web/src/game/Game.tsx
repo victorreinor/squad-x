@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { COINS_PER_LEVEL, IDLE, SHOP_FROM_LEVEL, STAR_COINS, TICK_MS, botInput, campaignLevel, campaignSpec, createGame, levelReward, randomSeed, runPayout, starsFor, step, type GameState, type Input, type Upgrades } from "@squadx/engine";
+import { COINS_PER_LEVEL, IDLE, SHOP_FROM_LEVEL, STAR_COINS, TICK_MS, botInput, campaignLevel, campaignSpec, createGame, levelReward, randomSeed, runPayout, bossOf, soldiersInStrip, starsFor, step, REPLAY_SHARES, type GameState, type Input, type LevelDef, type Upgrades } from "@squadx/engine";
 import { Scene3D } from "./scene";
 import { audio } from "./audio";
-import { causeOfLoss, deriveFeed, type FeedItem } from "./feed";
-import { Counter, Feed, StatusStrip } from "./hud";
+import { BOSS_IN_SIGHT, causeOfLoss, deriveFeed, type FeedItem } from "./feed";
+import { BossBar, Counter, Feed, StatusStrip } from "./hud";
 import { MODE_INFO, TWIST_INFO } from "./modes";
+import { BOSS_NAME } from "./names";
 import { playSounds } from "./sfx";
 import { lookFor } from "./themes";
 
@@ -26,9 +27,10 @@ interface Hud {
   coins: number;
   status: GameState["status"];
   popup: { text: string; good: boolean; key: number } | null;
-  boss: boolean;
-  /** the boss or a bomber has marked a strip of road */
-  slam: boolean;
+  /** the boss once it is in sight, for its health bar */
+  boss: { name: string; hp: number; max: number; enraged: boolean } | null;
+  /** what the squad has to get out of right now, if anything */
+  danger: "strip" | "fire" | "ice" | null;
   weapon: GameState["squad"]["weapon"];
   vehicles: GameState["squad"]["vehicles"];
 }
@@ -39,35 +41,60 @@ const wantsBot = () => {
   return value !== null && value !== "0" && value !== "false";
 };
 
+/** The boss for its health bar, once it is in sight. */
+const bossHud = (s: GameState): Hud["boss"] => {
+  const fight = s.bossFight;
+  const boss = fight ? bossOf(s) : undefined;
+  return fight && boss && boss.z - s.distance < BOSS_IN_SIGHT ? { name: BOSS_NAME[fight.kind], hp: boss.hp, max: boss.maxHp, enraged: fight.enraged } : null;
+};
+
+/** The warning over the road: a strip about to be hit (or a missile on its way), the squad standing in fire, or frozen. */
+const dangerOf = (s: GameState): Hud["danger"] => {
+  if (s.hazards.length || s.projectiles.some((p) => p.kind === "missile")) return "strip";
+  if (s.fires.some((f) => soldiersInStrip(s, f.x, f.halfWidth) > 0)) return "fire";
+  return s.chill ? "ice" : null;
+};
+
+/** What the warning says for each danger. */
+const DANGER_TEXT: Record<NonNullable<Hud["danger"]>, string> = { strip: "⚠ SAIA DA FAIXA!", fire: "🔥 SAIA DO FOGO!", ice: "❄ CONGELADOS!" };
+
+/** The boss's health in steps of a percent: the bar's own transition smooths the rest, and the HUD is not redrawn on every hit. */
+const bossStep = (h: Hud) => (h.boss ? Math.ceil((h.boss.hp / h.boss.max) * 100) : -1);
+
 const hudOf = (s: GameState): Hud => ({
   count: s.squad.count,
   progress: s.distance / s.length,
   coins: s.coins,
   status: s.status,
   popup: s.lastGate ? { text: s.lastGate.text, good: s.lastGate.good, key: s.lastGate.tick } : null,
-  boss: s.enemies.some((e) => e.kind === "boss"),
-  slam: s.hazards.length > 0,
+  boss: bossHud(s),
+  danger: dangerOf(s),
   weapon: s.squad.weapon,
   vehicles: [...s.squad.vehicles],
 });
 
 const sameHud = (a: Hud, b: Hud) =>
-  a.count === b.count && a.coins === b.coins && a.status === b.status && a.boss === b.boss && a.slam === b.slam && a.weapon === b.weapon && a.vehicles.join() === b.vehicles.join() && a.popup?.key === b.popup?.key && Math.round(a.progress * 100) === Math.round(b.progress * 100);
+  a.count === b.count && a.coins === b.coins && a.status === b.status && bossStep(a) === bossStep(b) && a.boss?.enraged === b.boss?.enraged && a.danger === b.danger && a.weapon === b.weapon && a.vehicles.join() === b.vehicles.join() && a.popup?.key === b.popup?.key && Math.round(a.progress * 100) === Math.round(b.progress * 100);
 
-/** One run of one level: the 3D scene, the fixed-step loop and the HUD on top. */
-export function Game({ level, upgrades, onFinish, onPlay, onShop, onExit }: { level: number; upgrades: Upgrades; onFinish: (r: RunResult) => void; onPlay: (level: number) => void; onShop: () => void; onExit: () => void }) {
+/**
+ * One run of one level: the 3D scene, the fixed-step loop and the HUD on top. `def` plays that road instead of the
+ * campaign's level `level` (the boss arena), and then the run ends without the report card: the caller decides what next.
+ */
+export function Game({ level, def, upgrades, record = { wins: 0, best: 0 }, onFinish, onPlay, onShop, onExit }: { level: number; def?: LevelDef; upgrades: Upgrades; record?: { wins: number; best: number }; onFinish: (r: RunResult) => void; onPlay: (level: number) => void; onShop: () => void; onExit: () => void }) {
   const host = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
   const [muted, setMuted] = useState(audio.muted);
-  const [feed, setFeed] = useState<(FeedItem & { id: number })[]>([]);
+  const [feed, setFeed] = useState<(FeedItem & { id: number; count: number })[]>([]);
   const finish = useRef(onFinish);
   finish.current = onFinish;
+  // the level's record as it was when the run started: the report is about this run, not the record it just set
+  const before = useRef(record).current;
   const spec = campaignSpec(level);
 
   useEffect(() => {
     const el = host.current!;
-    const state = createGame(campaignLevel(level), randomSeed(), upgrades);
+    const state = createGame(def ?? campaignLevel(level), randomSeed(), upgrades);
     const scene = new Scene3D(el, state);
     audio.resume();
     audio.playMusic("battle");
@@ -109,8 +136,16 @@ export function Game({ level, upgrades, onFinish, onPlay, onShop, onExit }: { le
         cause = causeOfLoss(prev, state) ?? cause;
         const news = deriveFeed(prev, state);
         if (news.length) {
-          const stamped = news.map((n) => ({ ...n, id: ++feedId }));
-          setFeed((old) => [...old, ...stamped].slice(-4));
+          const stamped = news.map((n) => ({ ...n, id: ++feedId, count: 1 }));
+          // the same news again while it is still on screen counts up on its line instead of stacking a copy
+          setFeed((old) => {
+            let next = old;
+            for (const n of stamped) {
+              const same = next.find((x) => x.text === n.text);
+              next = [...next.filter((x) => x !== same), same ? { ...n, count: same.count + 1 } : n];
+            }
+            return next.slice(-4);
+          });
           for (const n of stamped) window.setTimeout(() => setFeed((old) => old.filter((x) => x.id !== n.id)), 3200);
         }
       }
@@ -206,11 +241,21 @@ export function Game({ level, upgrades, onFinish, onPlay, onShop, onExit }: { le
               </button>
             </div>
           </div>
-          <div className="track">
-            <div className="track-fill" style={{ width: `${Math.min(100, hud.progress * 100)}%` }} />
-            {spec.boss && <span className="track-boss">☠</span>}
-          </div>
+          {hud.boss ? (
+            <BossBar name={hud.boss.name} hp={hud.boss.hp} max={hud.boss.max} enraged={hud.boss.enraged} />
+          ) : (
+            <div className="track">
+              <div className="track-fill" style={{ width: `${Math.min(100, hud.progress * 100)}%` }} />
+              {spec.boss && <span className="track-boss">☠</span>}
+            </div>
+          )}
           <StatusStrip state={{ count: hud.count, weapon: hud.weapon, vehicles: hud.vehicles }} upgrades={upgrades} />
+          {/* in the flow, between the panel and the messages, so it pushes the messages down instead of covering them */}
+          {hud.danger && (
+            <div key={hud.danger} className={`slam-warning ${hud.danger}`}>
+              {DANGER_TEXT[hud.danger]}
+            </div>
+          )}
           <Feed items={feed} />
           <div className="mode-banner">
             <b>
@@ -224,7 +269,6 @@ export function Game({ level, upgrades, onFinish, onPlay, onShop, onExit }: { le
               </em>
             )}
           </div>
-          {hud.slam && <div className="slam-warning">⚠ SAIA DA FAIXA!</div>}
           {hud.popup && hud.status === "playing" && (
             <div key={hud.popup.key} className={`popup ${hud.popup.good ? "good" : "bad"}`}>
               {hud.popup.text}
@@ -232,16 +276,22 @@ export function Game({ level, upgrades, onFinish, onPlay, onShop, onExit }: { le
           )}
         </div>
       )}
-      {result && <ResultCard result={result} upgrades={upgrades} onPlay={onPlay} onShop={onShop} onExit={onExit} />}
+      {result && !def && <ResultCard result={result} upgrades={upgrades} record={before} onPlay={onPlay} onShop={onShop} onExit={onExit} />}
     </div>
   );
 }
 
-/** The card after a run: what happened, where the coins came from and what to do next. */
-function ResultCard({ result, upgrades, onPlay, onShop, onExit }: { result: RunResult; upgrades: Upgrades; onPlay: (level: number) => void; onShop: () => void; onExit: () => void }) {
+/**
+ * The card after a run: what happened, where the coins came from and what to do next. `record` is how many times the
+ * level had been won and its best stars before this run: a level pays less every time it is won again, and only new
+ * stars pay.
+ */
+function ResultCard({ result, upgrades, record, onPlay, onShop, onExit }: { result: RunResult; upgrades: Upgrades; record: { wins: number; best: number }; onPlay: (level: number) => void; onShop: () => void; onExit: () => void }) {
   const { level } = result;
-  const total = runPayout(result.coins, result.stars, upgrades, level);
+  const total = runPayout(result.coins, result.stars, upgrades, level, record.wins, record.best);
   const bonus = Math.round(COINS_PER_LEVEL * upgrades.coins * 100);
+  const share = REPLAY_SHARES[record.wins] ?? 0;
+  const again = record.wins > 0 ? ` · ${Math.round(share * 100)}%` : "";
   const needsShop = !result.won && level >= SHOP_FROM_LEVEL;
   return (
     <div className="overlay">
@@ -268,16 +318,16 @@ function ResultCard({ result, upgrades, onPlay, onShop, onExit }: { result: RunR
           {result.won ? (
             <>
               <div>
-                <dt>Recompensa da fase</dt>
-                <dd>+{levelReward(level)} 🪙</dd>
+                <dt>Recompensa da fase{again}</dt>
+                <dd>+{Math.round(levelReward(level) * share)} 🪙</dd>
               </div>
               <div>
-                <dt>Estrelas</dt>
-                <dd>+{result.stars * STAR_COINS} 🪙</dd>
+                <dt>{record.best > 0 ? "Estrelas novas" : "Estrelas"}</dt>
+                <dd>+{Math.max(0, result.stars - record.best) * STAR_COINS} 🪙</dd>
               </div>
               <div>
                 <dt>Saque dos barris</dt>
-                <dd>+{result.coins} 🪙</dd>
+                <dd>+{Math.round(result.coins * share)} 🪙</dd>
               </div>
               {bonus > 0 && (
                 <div>

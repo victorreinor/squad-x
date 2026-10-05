@@ -1,6 +1,27 @@
 import * as THREE from "three";
 import { RoomEnvironment } from "three/examples/jsm/environments/RoomEnvironment.js";
-import { BOSS_SLAM_WARN, ENEMY_KINDS, STRIKE_WARN, LANE_HALF_WIDTH, WEAPON_DPS, nextRandom, vehicleXs, type Barrel, type EnemyKind, type Gate, type GameState, type Reward, type WeaponKind } from "@squadx/engine";
+import {
+  BOSS_LAUNCH_AHEAD,
+  BOSS_STANDOFF,
+  ENEMY_KINDS,
+  LANE_HALF_WIDTH,
+  MECH_GAP_HALF_WIDTH,
+  MECH_SHIELD_AHEAD,
+  PROJECTILE_STATS,
+  WEAPON_DPS,
+  bossOf,
+  nextRandom,
+  vehicleXs,
+  type Barrel,
+  type Enemy,
+  type EnemyKind,
+  type Gate,
+  type GameState,
+  type Hazard,
+  type Projectile,
+  type Reward,
+  type WeaponKind,
+} from "@squadx/engine";
 import { Crowd, partsToGroup, toonRamp } from "./crowd";
 import { BOSS_FIGURES, BOSS_SCALE, ENEMY_LOOKS, runEnemy, runGun, runSoldier, weaponParts } from "./figures";
 import { FAR_BELOW, ROW_SPACING, SQUAD_SHOWN, squadFormation, type Formation } from "./formation";
@@ -8,7 +29,7 @@ import { TextSprite } from "./labels";
 import { sharpness } from "./sharpness";
 import { lookFor } from "./themes";
 import { addBackdrop, addBarriers, addBridge, addWorld, type Dressing } from "./scenery";
-import { bombParts, mineLight, mineParts, planeParts, spikesParts } from "./props";
+import { KEG_AXLE, bombParts, kegParts, meteorParts, mineLight, mineParts, missileParts, planeParts, spikesParts } from "./props";
 import { HOVER, VEHICLE_NAMES, VEHICLE_SHOT, buildVehicle, type VehicleModel } from "./vehicles";
 
 /** The engine runs down +z; the camera looks down -z so +x is on the right. */
@@ -19,6 +40,8 @@ const PARTICLE_CAPACITY = 360;
 /** seconds between two bullets of one column */
 const FIRE_GAP = 0.085;
 const BULLET_SPEED = 80;
+/** the colour of the squad's tracers: a strong amber that reads as a shot on the pale bridge and on the dark roads alike */
+const SQUAD_TRACER = 0xffb81c;
 
 const WEAPON_NAMES: Record<WeaponKind, string> = { pistol: "PISTOLA", rifle: "FUZIL", smg: "SUBMET.", minigun: "MINIGUN" };
 
@@ -61,8 +84,38 @@ interface Shock {
   size: number;
 }
 
-/** Ticks before a bomb lands during which it is drawn falling. */
+/** Ticks before a bomb or a meteor lands during which it is drawn falling. */
 const BOMB_FALL_TICKS = 26;
+
+/** How each kind of mark on the road looks: the colour it reddens (or blues) to, and how far up the road it reaches (units). */
+const MARK_LOOK: Record<Hazard["kind"] | "missile", { color: number; length: number }> = {
+  slam: { color: 0xff2a2a, length: 30 },
+  bomb: { color: 0xff2a2a, length: 16 },
+  laser: { color: 0xff2a7a, length: 30 },
+  // a deep blue: a pale one disappears on the snow
+  ice: { color: 0x1a6dff, length: 30 },
+  meteor: { color: 0xff6a1a, length: 16 },
+  missile: { color: 0xff2a2a, length: 10 },
+};
+
+/** How far a missile flies from the boss to the squad (units), for the warning under it to fill in on the way. */
+const MISSILE_FLIGHT = BOSS_STANDOFF - BOSS_LAUNCH_AHEAD;
+
+/** Whether something that happens `perSecond` times a second happens in a frame of `dt` seconds: smoke and sparks keep the same pace at any frame rate. */
+const often = (perSecond: number, dt: number) => Math.random() < perSecond * dt;
+
+/** One mark on the road to draw: where, how wide, how close it is to landing (0 to 1) and what it looks like. */
+interface Mark {
+  kind: keyof typeof MARK_LOOK;
+  x: number;
+  halfWidth: number;
+  urgency: number;
+  /** ticks left before it lands, for a bomb or a meteor falling onto it */
+  ticks?: number;
+}
+
+/** How much further up the road the camera looks in a boss fight (units). */
+const BOSS_LOOK_AHEAD = 4;
 
 /** Seconds a fallen enemy lies on the road before it is gone. */
 const GHOST_LIFE = 0.75;
@@ -125,6 +178,8 @@ export class Scene3D {
   /** the size and the depth the squad is drawn with, easing towards those of its formation */
   private squadScale = 1;
   private squadDepth = 0;
+  /** 0 to 1: how far the camera has turned to frame a boss fight, looking further up the road */
+  private bossFocus = 0;
   private readonly enemyCrowds = {} as Record<EnemyKind, Crowd>;
   private readonly enemyFx = new Map<number, EnemyFx>();
   private readonly ghosts: Ghost[] = [];
@@ -133,8 +188,25 @@ export class Scene3D {
   private readonly glows: Glow[] = [];
   private readonly idleGlows: { additive: THREE.Sprite[]; smoke: THREE.Sprite[] } = { additive: [], smoke: [] };
   private readonly shocks: Shock[] = [];
-  /** one marked strip per hazard: red fill, bright edge and, for a bomb, the bomb on its way down */
-  private readonly hazardViews: { fill: THREE.Mesh; edge: THREE.Mesh; bomb: THREE.Group }[] = [];
+  /** one marked strip per mark on the road: coloured fill, bright edge and, for a bomb or a meteor, the thing on its way down */
+  private readonly hazardViews: { fill: THREE.Mesh; edge: THREE.Mesh; bomb: THREE.Group; meteor: THREE.Group }[] = [];
+  /** missiles and kegs on their way, by id, and the idle models kept for the next ones */
+  private readonly projectileViews = new Map<number, THREE.Group>();
+  private readonly idleProjectiles: Record<Projectile["kind"], THREE.Group[]> = { missile: [], keg: [] };
+  /** the Mecha's shield: two panels of light either side of the opening, and a strip on the road showing where the shots get through */
+  private readonly shield: { left: THREE.Mesh; right: THREE.Mesh; lane: THREE.Mesh; x: number };
+  /** the strips of road on fire, by id */
+  private readonly fireViews = new Map<number, THREE.Mesh>();
+  private readonly fireTex: THREE.CanvasTexture;
+  /** a red glow behind an enraged boss */
+  private readonly aura: THREE.Sprite;
+  /** the Mecha's laser beam, one box stretched from its visor to the road, and how long it still shows (s) */
+  private readonly laser: THREE.Mesh;
+  private laserLife = 0;
+  /** the ring of force every blast spreads on the ground: one shape, scaled */
+  private readonly ringGeo = new THREE.RingGeometry(0.85, 1, 40);
+  /** when the boss last threw something, for its arms */
+  private throwAt = -10;
   private readonly hazardStrip: THREE.BufferGeometry;
   private readonly trapViews = new Map<number, { group: THREE.Group; light: THREE.Group | null }>();
   private readonly plane: THREE.Group;
@@ -142,7 +214,6 @@ export class Scene3D {
   private readonly gates = new Map<number, GateView>();
   private readonly barrels = new Map<number, BarrelView>();
   private readonly count = new TextSprite(2.6, 1.3);
-  private readonly bossBar = new TextSprite(6, 1.4);
   private readonly bulletMesh: THREE.InstancedMesh;
   private readonly bullets: Bullet[] = [];
   private readonly fireClock: number[] = [];
@@ -183,9 +254,8 @@ export class Scene3D {
 
     this.squad = new Crowd(SQUAD_SHOWN, runSoldier("pistol"), this.ramp);
     this.squadFar = new Crowd(SQUAD_SHOWN, runSoldier("pistol", true), this.ramp);
-    const world = Math.max(0, ["bridge", "desert", "city", "snow", "volcano"].indexOf(state.theme));
     for (const kind of ENEMY_KINDS) {
-      this.enemyCrowds[kind] = kind === "boss" ? new Crowd(3, BOSS_FIGURES[world].figure(), this.ramp) : new Crowd(ENEMY_LOOKS[kind].capacity, runEnemy(kind), this.ramp);
+      this.enemyCrowds[kind] = kind === "boss" ? new Crowd(3, BOSS_FIGURES[state.bossFight?.kind ?? "general"].figure(), this.ramp) : new Crowd(ENEMY_LOOKS[kind].capacity, runEnemy(kind), this.ramp);
     }
     for (const crowd of [this.squad, this.squadFar, ...Object.values(this.enemyCrowds)]) {
       this.scene.add(crowd.group);
@@ -196,6 +266,28 @@ export class Scene3D {
     this.hazardStrip = new THREE.PlaneGeometry(1, 1);
     this.hazardStrip.rotateX(-Math.PI / 2);
     this.disposables.push(this.hazardStrip);
+
+    // the Mecha's shield: see-through panels with a honeycomb of light, and a pale strip on the road under the opening
+    const panelGeo = new THREE.PlaneGeometry(1, 1);
+    const panelMat = new THREE.MeshBasicMaterial({ map: honeycombTexture(), color: 0x6ae8ff, transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, blending: THREE.AdditiveBlending });
+    const laneMat = new THREE.MeshBasicMaterial({ color: 0x8dffc8, transparent: true, opacity: 0.16, depthWrite: false });
+    this.shield = { left: new THREE.Mesh(panelGeo, panelMat), right: new THREE.Mesh(panelGeo, panelMat), lane: new THREE.Mesh(this.hazardStrip, laneMat), x: 0 };
+    for (const m of [this.shield.left, this.shield.right, this.shield.lane]) {
+      m.visible = false;
+      m.renderOrder = 5;
+      this.scene.add(m);
+    }
+    this.disposables.push(panelGeo, panelMat, panelMat.map!, laneMat);
+
+    this.fireTex = flameTexture();
+    this.disposables.push(this.fireTex);
+    this.aura = new THREE.Sprite(new THREE.SpriteMaterial({ map: this.glowTex, color: 0xff2a1a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, fog: false }));
+    this.aura.visible = false;
+    this.scene.add(this.aura);
+    this.laser = new THREE.Mesh(new THREE.BoxGeometry(0.35, 0.35, 1), new THREE.MeshBasicMaterial({ color: 0xff3a8a, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+    this.laser.visible = false;
+    this.scene.add(this.laser);
+    this.disposables.push(this.aura.material, this.laser.geometry, this.laser.material as THREE.Material, this.ringGeo);
 
     // the bomber that flies across the road, and its shadow on the tarmac
     this.plane = partsToGroup(planeParts(), this.ramp);
@@ -221,13 +313,12 @@ export class Scene3D {
     }
 
     this.count.sprite.renderOrder = 10;
-    this.bossBar.sprite.renderOrder = 10;
-    this.bossBar.sprite.visible = false;
-    this.scene.add(this.count.sprite, this.bossBar.sprite);
-    this.disposables.push(this.count, this.bossBar);
+    this.scene.add(this.count.sprite);
+    this.disposables.push(this.count);
 
     const bulletGeo = new THREE.BoxGeometry(0.07, 0.07, 1);
-    this.bulletMesh = new THREE.InstancedMesh(bulletGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.9, blending: THREE.AdditiveBlending, depthWrite: false }), BULLET_CAPACITY);
+    // drawn over the road rather than added to it: an added glow washes out to white on the pale bridge
+    this.bulletMesh = new THREE.InstancedMesh(bulletGeo, new THREE.MeshBasicMaterial({ transparent: true, opacity: 0.95, depthWrite: false }), BULLET_CAPACITY);
     this.bulletMesh.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(BULLET_CAPACITY * 3), 3);
     this.bulletMesh.frustumCulled = false;
     this.bulletMesh.count = 0;
@@ -520,10 +611,14 @@ export class Scene3D {
     const formation = squadFormation(cur.squad.count);
     this.squadScale = lerp(this.squadScale, formation.scale, 0.2);
     this.squadDepth = lerp(this.squadDepth, formation.depth, 0.2);
+    // in a boss fight the camera looks further ahead, so the boss stands clear of the panels at the top of the screen
+    const boss = cur.bossFight ? bossOf(cur) : undefined;
+    this.bossFocus = lerp(this.bossFocus, cur.bossFight?.awake ? 1 : 0, Math.min(1, dt * 1.5));
     this.placeCamera(squadX, distance, dt);
-    this.drawSquad(cur, formation, squadX, distance, time, walking);
+    this.drawSquad(cur, formation, squadX, distance, time, dt, walking);
     this.drawEnemies(prev, cur, alpha, time, dt);
-    this.drawHazards(cur, distance);
+    this.drawHazards(cur, distance, dt);
+    this.drawBossWork(prev, cur, boss, alpha, distance, time, dt);
     this.drawPlane(prev, cur, alpha, distance);
     this.drawTraps(cur, distance, time);
     this.drawGatesAndBarrels(cur, distance, time);
@@ -546,10 +641,10 @@ export class Scene3D {
     // a deep squad stretches behind its front row: back the camera up so the last rows are not cut off
     const depth = Math.max(0, this.squadDepth - 3 * ROW_SPACING) * 0.55;
     this.camera.position.set(squadX * 0.3 + (Math.random() - 0.5) * jitter, Math.sin(elevation) * dist + (Math.random() - 0.5) * jitter + depth * 0.3, Z(distance - depth) + Math.cos(elevation) * dist);
-    this.camera.lookAt(squadX * 0.15, 0.4, Z(distance + 7 - depth));
+    this.camera.lookAt(squadX * 0.15, 0.4, Z(distance + 7 + BOSS_LOOK_AHEAD * this.bossFocus - depth));
   }
 
-  private drawSquad(cur: GameState, formation: Formation, squadX: number, distance: number, time: number, walking: boolean) {
+  private drawSquad(cur: GameState, formation: Formation, squadX: number, distance: number, time: number, dt: number, walking: boolean) {
     const { count, weapon } = cur.squad;
     if (weapon !== this.lastWeapon) {
       this.squad.setGun(runGun(weapon));
@@ -560,6 +655,9 @@ export class Scene3D {
     const { shown, cols, dx, dz } = formation;
     const left = squadX - ((cols - 1) * dx) / 2;
     const crowd = formation.scale < FAR_BELOW ? this.squadFar : this.squad;
+    // the Yeti's ice leaves the squad pale and glittering until it thaws
+    const frost = cur.chill ? 0.3 + 0.1 * Math.sin(time * 9) : 0;
+    if (cur.chill && often(15, dt)) this.burst(squadX + (Math.random() - 0.5) * 3, 1.2, distance - Math.random() * 2, 0xd8f6ff, 1, 0.15);
     this.squad.begin();
     this.squadFar.begin();
     for (let k = 0; k < shown; k++) {
@@ -570,7 +668,7 @@ export class Scene3D {
       const tz = distance - row * dz;
       this.slotX[k] = this.slotX[k] === undefined ? tx : lerp(this.slotX[k], tx, 0.28);
       this.slotZ[k] = this.slotZ[k] === undefined ? tz : lerp(this.slotZ[k], tz, 0.28);
-      crowd.add(this.slotX[k], Z(this.slotZ[k]), this.squadScale, 0, k * 1.7, walking ? time : 0, 0, 0, 0.06, firing ? 0.035 * Math.abs(Math.sin(time * 38 + k)) : 0);
+      crowd.add(this.slotX[k], Z(this.slotZ[k]), this.squadScale, 0, k * 1.7, walking ? time : 0, frost, 0, 0.06, firing ? 0.035 * Math.abs(Math.sin(time * 38 + k)) : 0);
     }
     this.squad.end();
     this.squadFar.end();
@@ -605,9 +703,6 @@ export class Scene3D {
   private drawEnemies(prev: GameState, cur: GameState, alpha: number, time: number, dt: number) {
     const before = new Map(prev.enemies.map((e) => [e.id, e]));
     for (const crowd of Object.values(this.enemyCrowds)) crowd.begin();
-    let bossHp = -1;
-    let bossX = 0;
-    let bossZ = 0;
     const seen = new Set<number>();
     for (const e of cur.enemies) {
       seen.add(e.id);
@@ -629,12 +724,9 @@ export class Scene3D {
       if (e.kind === "boss") {
         // the boss stands and stamps instead of running
         // before a smash the boss lifts both arms over its head, more the closer the strike is
-        const hazard = cur.hazards[0];
-        const raise = hazard ? Math.min(1, 1 - hazard.ticks / BOSS_SLAM_WARN + 0.15) : 0;
+        const mark = cur.hazards.find((h) => h.from === "boss");
+        const raise = Math.max(mark ? Math.min(1, 1 - mark.ticks / mark.warn + 0.15) : 0, 1 - (time - this.throwAt) / 0.5);
         this.enemyCrowds.boss.add(x, Z(z), BOSS_SCALE, Math.PI, phase, time * 0.35, fx.flash, 0, 0, 0, raise);
-        bossHp = e.hp;
-        bossX = x;
-        bossZ = z;
       } else {
         const v = ENEMY_LOOKS[e.kind];
         // a shooter that has stopped to fire stands still
@@ -656,55 +748,206 @@ export class Scene3D {
       this.enemyCrowds[g.kind].add(g.x, Z(g.z), scale * (1 - Math.max(0, g.age - 0.5) * 2), Math.PI, 0, 0, 0, Math.min(1, g.age / 0.3), 0);
     }
     for (const crowd of Object.values(this.enemyCrowds)) crowd.end();
-
-    const bar = this.bossBar.sprite;
-    bar.visible = bossHp >= 0;
-    if (bossHp >= 0) {
-      this.bossBar.set(String(Math.ceil(bossHp)), "#ffffff", "#8b1d1d");
-      bar.position.set(bossX, 6.2, Z(bossZ));
-    }
   }
 
-  /** The strips of road the boss and the bombers have marked: each reddens as the blow gets closer, and a bomb falls onto it at the end. */
-  private drawHazards(cur: GameState, distance: number) {
-    while (this.hazardViews.length < cur.hazards.length) {
+  /**
+   * The strips of road about to be hit: each fills in with its colour as the blow gets closer (red for a slam, a bomb or
+   * a missile, pink for a laser, blue for ice, orange for a meteor), and a bomb or a meteor falls onto it at the end.
+   */
+  private drawHazards(cur: GameState, distance: number, dt: number) {
+    const marks: Mark[] = cur.hazards.map((h) => ({ kind: h.kind, x: h.x, halfWidth: h.halfWidth, urgency: 1 - h.ticks / h.warn, ticks: h.ticks }));
+    for (const p of cur.projectiles) {
+      if (p.kind === "missile") marks.push({ kind: "missile", x: p.targetX, halfWidth: PROJECTILE_STATS.missile.blast, urgency: Math.max(0, 1 - (p.z - distance) / MISSILE_FLIGHT) });
+    }
+    while (this.hazardViews.length < marks.length) {
       const mat = (color: number) => new THREE.MeshBasicMaterial({ color, transparent: true, opacity: 0, depthWrite: false });
       const fill = new THREE.Mesh(this.hazardStrip, mat(0xff2a2a));
       const edge = new THREE.Mesh(this.hazardStrip, mat(0xffd0c0));
       const bomb = partsToGroup(bombParts(), this.ramp);
       bomb.scale.setScalar(1.3);
       bomb.rotation.z = Math.PI;
-      for (const m of [edge, fill, bomb]) {
+      const meteor = partsToGroup(meteorParts(), this.ramp);
+      meteor.scale.setScalar(1.6);
+      for (const m of [edge, fill, bomb, meteor]) {
         m.visible = false;
         m.renderOrder = 4;
         this.scene.add(m);
       }
       this.disposables.push(fill.material as THREE.Material, edge.material as THREE.Material);
-      this.hazardViews.push({ fill, edge, bomb });
+      this.hazardViews.push({ fill, edge, bomb, meteor });
     }
     this.hazardViews.forEach((view, i) => {
-      const h = cur.hazards[i];
+      const h = marks[i];
       view.fill.visible = view.edge.visible = !!h;
-      view.bomb.visible = !!h && h.kind === "bomb" && h.ticks <= BOMB_FALL_TICKS;
+      const falling = !!h && h.ticks !== undefined && h.ticks <= BOMB_FALL_TICKS;
+      view.bomb.visible = falling && h.kind === "bomb";
+      view.meteor.visible = falling && h.kind === "meteor";
       if (!h) return;
-      const total = h.kind === "slam" ? BOSS_SLAM_WARN : STRIKE_WARN;
+      const look = MARK_LOOK[h.kind];
       const width = (h.halfWidth + 0.45) * 2;
-      const length = h.kind === "slam" ? 30 : 16;
-      const urgency = 1 - h.ticks / total;
-      const zMid = distance + length / 2 - 2;
+      const zMid = distance + look.length / 2 - 2;
       for (const m of [view.fill, view.edge]) {
         m.position.set(h.x, 0.06, Z(zMid));
-        m.scale.set(width, 1, length);
+        m.scale.set(width, 1, look.length);
       }
       view.edge.scale.x = width + 0.35;
-      (view.fill.material as THREE.MeshBasicMaterial).opacity = 0.15 + 0.5 * urgency * (0.75 + 0.25 * Math.sin(urgency * 40));
+      const fill = view.fill.material as THREE.MeshBasicMaterial;
+      fill.color.setHex(look.color);
+      fill.opacity = 0.15 + 0.5 * h.urgency * (0.75 + 0.25 * Math.sin(h.urgency * 40));
       (view.edge.material as THREE.MeshBasicMaterial).opacity = 0.25;
+      const fall = Math.min(1, (h.ticks ?? 0) / BOMB_FALL_TICKS);
       if (h.kind === "bomb") {
-        const fall = Math.min(1, h.ticks / BOMB_FALL_TICKS);
         view.bomb.position.set(h.x, 0.3 + fall * fall * 16, Z(distance + 5));
         view.bomb.rotation.y += 0.2;
+      } else if (h.kind === "meteor") {
+        // meteors come down at a slant, out of the sky behind the Demon
+        view.meteor.position.set(h.x + fall * 3, fall * fall * 22, Z(distance + 5 + fall * 14));
+        view.meteor.rotation.x += 0.08;
+        // a trail of fire and smoke behind it
+        const at = view.meteor.position;
+        if (often(30, dt)) this.flash(at.x + 0.3, at.y + 1.2, -at.z + 0.6, 0xffa040, 1.4, 2.4, 0.18);
+        if (often(12, dt)) this.puff(at.x + 0.4, at.y + 1.4, -at.z + 1, 0x4a3a34, 1, 2.2, 0.6, 0.6);
       }
     });
+  }
+
+  /**
+   * What a boss has set going besides its marks: the missiles and kegs on their way, the Mecha's shield, the fire on
+   * the road, the glow of an enraged boss and the laser beams fading out.
+   */
+  private drawBossWork(prev: GameState, cur: GameState, boss: Enemy | undefined, alpha: number, distance: number, time: number, dt: number) {
+    // missiles and kegs, each eased between the last two ticks
+    const before = new Map(prev.projectiles.map((p) => [p.id, p]));
+    const live = new Set<number>();
+    for (const p of cur.projectiles) {
+      live.add(p.id);
+      let view = this.projectileViews.get(p.id);
+      if (!view) {
+        view = this.idleProjectiles[p.kind].pop() ?? this.buildProjectile(p.kind);
+        view.rotation.set(0, 0, 0);
+        this.scene.add(view);
+        this.projectileViews.set(p.id, view);
+      }
+      const was = before.get(p.id) ?? p;
+      const x = lerp(was.x, p.x, alpha);
+      const z = lerp(was.z, p.z, alpha);
+      if (p.kind === "missile") {
+        // it dives from the boss's shoulder to the squad, nose first
+        const height = 0.9 + 2.6 * Math.min(1, Math.max(0, (z - distance) / MISSILE_FLIGHT));
+        view.position.set(x, height, Z(z));
+        // the model points down -z; turn it toward where it is going, nose a little down
+        view.rotation.order = "YXZ";
+        view.rotation.set(-0.2, Math.atan2(-(p.x - was.x), -(was.z - p.z)), 0);
+        view.scale.setScalar(1.25);
+        if (often(18, dt)) this.puff(x, height, z + 0.9, 0xb8b0a8, 0.4, 1.2, 0.5, 0.4);
+      } else {
+        // a keg rolls toward the squad, turning over its axle, with its hit points over it: it can be shot to pieces
+        const size = 1.1;
+        view.scale.setScalar(size);
+        view.position.set(x, KEG_AXLE * size, Z(z));
+        (view.userData.body as THREE.Group).rotation.x = -z / (KEG_AXLE * size);
+        (view.userData.hp as TextSprite).set(String(Math.ceil(p.hp)), "#ffffff", "#7a1e1a");
+      }
+    }
+    for (const [id, view] of this.projectileViews) {
+      if (live.has(id)) continue;
+      view.removeFromParent();
+      this.idleProjectiles[view.userData.kind as Projectile["kind"]].push(view);
+      this.projectileViews.delete(id);
+    }
+
+    // the Mecha's shield stands between it and the squad, with the opening sliding to its new place
+    const fight = cur.bossFight;
+    const shielded = !!fight && fight.gap !== null && !!boss;
+    const { left, right, lane } = this.shield;
+    left.visible = right.visible = lane.visible = shielded;
+    if (shielded) {
+      this.shield.x = lerp(this.shield.x, fight.gap!, Math.min(1, dt * 6));
+      const gapL = this.shield.x - MECH_GAP_HALF_WIDTH;
+      const gapR = this.shield.x + MECH_GAP_HALF_WIDTH;
+      const edge = LANE_HALF_WIDTH + 0.6;
+      const z = Z(boss.z - MECH_SHIELD_AHEAD);
+      const height = 5.5;
+      const place = (m: THREE.Mesh, from: number, to: number) => {
+        m.visible = to - from > 0.05;
+        m.position.set((from + to) / 2, height / 2, z);
+        m.scale.set(Math.max(0.01, to - from), height, 1);
+      };
+      place(left, -edge, gapL);
+      place(right, gapR, edge);
+      (left.material as THREE.MeshBasicMaterial).opacity = 0.45 + 0.1 * Math.sin(time * 5);
+      const length = boss.z - MECH_SHIELD_AHEAD - distance + 2;
+      lane.position.set(this.shield.x, 0.05, Z(distance - 2 + length / 2));
+      lane.scale.set(MECH_GAP_HALF_WIDTH * 2, 1, length);
+    }
+
+    // fire on the road: a band of flames up the strip, licking and smoking
+    const fires = new Set(cur.fires.map((f) => f.id));
+    for (const f of cur.fires) {
+      let view = this.fireViews.get(f.id);
+      if (!view) {
+        view = new THREE.Mesh(this.hazardStrip, new THREE.MeshBasicMaterial({ map: this.fireTex, color: 0xffffff, transparent: true, depthWrite: false, blending: THREE.AdditiveBlending }));
+        view.renderOrder = 4;
+        this.scene.add(view);
+        this.fireViews.set(f.id, view);
+      }
+      const length = 16;
+      view.position.set(f.x, 0.07, Z(distance + length / 2 - 2));
+      view.scale.set((f.halfWidth + 0.45) * 2, 1, length);
+      (view.material as THREE.MeshBasicMaterial).opacity = Math.min(1, f.ticks / 20) * (0.75 + 0.25 * Math.sin(time * 13 + f.id));
+      if (often(20, dt)) this.flash(f.x + (Math.random() - 0.5) * f.halfWidth * 2, 0.4, distance - 1 + Math.random() * 14, Math.random() < 0.5 ? 0xff7a1a : 0xffc04a, 0.5, 1.4, 0.3);
+      if (often(4, dt)) this.puff(f.x, 1, distance + Math.random() * 12, 0x3a302c, 0.8, 2.4, 0.9, 1.4);
+    }
+    for (const [id, view] of this.fireViews) {
+      if (fires.has(id)) continue;
+      view.removeFromParent();
+      (view.material as THREE.Material).dispose();
+      this.fireViews.delete(id);
+    }
+
+    // an enraged boss glows red behind, pulsing
+    this.aura.visible = !!fight?.enraged && !!boss;
+    if (this.aura.visible && boss) {
+      const k = 10 + Math.sin(time * 6) * 1.2;
+      this.aura.position.set(boss.x, 3.6, Z(boss.z + 0.6));
+      this.aura.scale.set(k, k * 1.15, 1);
+      this.aura.material.opacity = 0.55 + 0.15 * Math.sin(time * 6);
+    }
+
+    this.laserLife = Math.max(0, this.laserLife - dt);
+    this.laser.visible = this.laserLife > 0;
+    (this.laser.material as THREE.MeshBasicMaterial).opacity = this.laserLife / 0.3;
+  }
+
+  /**
+   * The model of a missile or a keg. A keg is a frame that holds its hit points upright and the barrel that rolls
+   * inside it, so the number does not roll with it.
+   */
+  private buildProjectile(kind: Projectile["kind"]): THREE.Group {
+    if (kind === "missile") {
+      const missile = partsToGroup(missileParts(), this.ramp);
+      missile.userData.kind = kind;
+      return missile;
+    }
+    const frame = new THREE.Group();
+    const body = partsToGroup(kegParts(), this.ramp);
+    const hp = new TextSprite(1.5, 0.75);
+    hp.sprite.position.y = 1.15;
+    hp.sprite.renderOrder = 10;
+    frame.add(body, hp.sprite);
+    frame.userData = { kind, body, hp };
+    this.disposables.push(hp);
+    return frame;
+  }
+
+  /** The Mecha's laser: a beam from its visor down to the strip it hits. */
+  private beam(fromX: number, fromZ: number, toX: number, toZ: number) {
+    const from = new THREE.Vector3(fromX, 6, Z(fromZ));
+    const to = new THREE.Vector3(toX, 0.3, Z(toZ));
+    this.laser.position.copy(from).add(to).multiplyScalar(0.5);
+    this.laser.scale.set(1, 1, from.distanceTo(to));
+    this.laser.lookAt(to);
+    this.laserLife = 0.3;
   }
 
   /** The bomber flying across the sky ahead of the squad, with its shadow sliding along the road. */
@@ -752,7 +995,7 @@ export class Scene3D {
     if (cur.status === "playing") {
       cur.volleys.forEach((v, i) => {
         this.fireClock[i] = (this.fireClock[i] ?? 0) + dt;
-        const shot = v.vehicle ? VEHICLE_SHOT[v.vehicle] : { gap: FIRE_GAP, color: 0xfff1a8, thick: 1 };
+        const shot = v.vehicle ? VEHICLE_SHOT[v.vehicle] : { gap: FIRE_GAP, color: SQUAD_TRACER, thick: 1.3 };
         while (this.fireClock[i] >= shot.gap) {
           this.fireClock[i] -= shot.gap;
           if (this.bullets.length < BULLET_CAPACITY) {
@@ -830,20 +1073,57 @@ export class Scene3D {
       this.explosion(hit.x, hit.z, hit.kind === "bomb" ? 1.7 : hit.kind === "mine" ? 1.3 : 0.9, hit.kind === "spikes" ? 0xd8d0c0 : 0xff8a2a);
       this.shake = Math.min(1, this.shake + (hit.lost > 0 ? 0.6 : 0.3));
     }
-    // a mine shot to pieces before it could do any harm
-    for (const mine of cur.popped) {
-      this.burst(mine.x, 0.4, mine.z, 0xffc24a, 14, 1.4);
-      this.puff(mine.x, 0.5, mine.z, 0xb8b0a0, 0.8, 2.6, 0.5, 1);
+    // a mine, missile or keg shot to pieces before it could do any harm
+    for (const p of cur.popped) {
+      if (p.kind === "mine") {
+        this.burst(p.x, 0.4, p.z, 0xffc24a, 14, 1.4);
+        this.puff(p.x, 0.5, p.z, 0xb8b0a0, 0.8, 2.6, 0.5, 1);
+      } else this.explosion(p.x, p.z, p.kind === "missile" ? 0.7 : 0.9, 0xffb03a);
     }
-    // the boss's smash: dust and red sparks across the strip, and the whole screen shakes
-    if (cur.lastSlam && cur.lastSlam.tick === cur.tick) {
-      for (let k = 0; k < 6; k++) {
-        const zz = cur.distance + 1 + k * 2.5;
-        this.burst(cur.lastSlam.x + (Math.random() - 0.5) * 2, 0.4, zz, k % 2 ? 0xff5a3a : 0xd8c8a8, 14, 2.2);
-        this.puff(cur.lastSlam.x + (Math.random() - 0.5) * 1.5, 0.5, zz, 0xb8a888, 1.4, 4, 0.8, 1.2);
+    // a missile or a keg setting off from the boss
+    const known = new Set(prev.projectiles.map((p) => p.id));
+    for (const p of cur.projectiles) {
+      if (known.has(p.id)) continue;
+      this.throwAt = performance.now() / 1000;
+      if (p.kind === "missile") {
+        this.flash(p.x, 3.4, p.z, 0xffd080, 1, 3, 0.2);
+        this.puff(p.x, 3.4, p.z, 0xc8c0b8, 1, 3, 0.7, 0.6);
+      } else this.puff(p.x, 0.6, p.z, 0xd8c8a8, 0.8, 2.4, 0.6, 0.5);
+    }
+    // what the boss's attacks did when they landed
+    const boss = cur.bossHits.length ? bossOf(prev) : undefined;
+    for (const hit of cur.bossHits) {
+      if (hit.kind === "slam") {
+        // the smash: dust and red sparks up the strip, and the whole screen shakes
+        for (let k = 0; k < 6; k++) {
+          const zz = cur.distance + 1 + k * 2.5;
+          this.burst(hit.x + (Math.random() - 0.5) * 2, 0.4, zz, k % 2 ? 0xff5a3a : 0xd8c8a8, 14, 2.2);
+          this.puff(hit.x + (Math.random() - 0.5) * 1.5, 0.5, zz, 0xb8a888, 1.4, 4, 0.8, 1.2);
+        }
+        this.explosion(hit.x, cur.distance + 6, 1.4, 0xffa040);
+        this.shake = 1;
+      } else if (hit.kind === "missile" || hit.kind === "keg") {
+        this.explosion(hit.x, hit.z, hit.kind === "missile" ? 1.3 : 1.1);
+        this.shake = Math.min(1, this.shake + (hit.lost > 0 ? 0.6 : 0.3));
+      } else if (hit.kind === "laser") {
+        this.beam(boss?.x ?? 0, boss?.z ?? cur.distance + 14, hit.x, cur.distance + 2);
+        for (let k = 0; k < 5; k++) this.burst(hit.x + (Math.random() - 0.5) * 2, 0.3, cur.distance + k * 2.5, 0xff5aa0, 10, 1.6);
+        this.flash(hit.x, 0.5, cur.distance + 2, 0xff3a8a, 2, 6, 0.3);
+        this.shake = Math.min(1, this.shake + 0.5);
+      } else if (hit.kind === "ice") {
+        for (let k = 0; k < 6; k++) {
+          const zz = cur.distance + k * 2.5;
+          this.burst(hit.x + (Math.random() - 0.5) * 2.4, 0.4, zz, k % 2 ? 0xd8f6ff : 0x7fd8ff, 12, 1.6);
+          this.puff(hit.x + (Math.random() - 0.5) * 2, 0.6, zz, 0xeaf8ff, 1.2, 3.6, 0.8, 0.8);
+        }
+        this.shake = Math.min(1, this.shake + 0.3);
+      } else if (hit.kind === "meteor") {
+        this.explosion(hit.x, cur.distance + 5, 1.6, 0xff6a1a);
+        this.shake = Math.min(1, this.shake + 0.7);
+      } else {
+        // the fire taking soldiers: a few sparks over the squad
+        this.burst(hit.x, 0.8, cur.distance, 0xff8a2a, 6, 0.8);
       }
-      this.explosion(cur.lastSlam.x, cur.distance + 6, 1.4, 0xffa040);
-      this.shake = 1;
     }
   }
 
@@ -924,7 +1204,7 @@ export class Scene3D {
     this.puff(x + 0.4 * power, 0.8, z - 0.3 * power, 0x7a7068, 1.2 * power, 4.5 * power, 0.7, 1);
     this.burst(x, 1, z, color, Math.round(10 * power), 1.6 * power);
     if (this.shocks.length < 6) {
-      const mesh = new THREE.Mesh(new THREE.RingGeometry(0.85, 1, 40), new THREE.MeshBasicMaterial({ color: 0xffe2b0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
+      const mesh = new THREE.Mesh(this.ringGeo, new THREE.MeshBasicMaterial({ color: 0xffe2b0, transparent: true, opacity: 0.5, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide }));
       mesh.rotation.x = -Math.PI / 2;
       mesh.position.set(x, 0.07, Z(z));
       this.scene.add(mesh);
@@ -953,7 +1233,6 @@ export class Scene3D {
       sh.life -= dt;
       if (sh.life <= 0) {
         sh.mesh.removeFromParent();
-        sh.mesh.geometry.dispose();
         (sh.mesh.material as THREE.Material).dispose();
         this.shocks.splice(i, 1);
         continue;
@@ -1020,6 +1299,60 @@ function roadTexture(base: string): THREE.CanvasTexture {
   t.colorSpace = THREE.SRGBColorSpace;
   t.wrapS = t.wrapT = THREE.RepeatWrapping;
   t.anisotropy = 4;
+  return t;
+}
+
+/** A honeycomb of thin bright lines, for the Mecha's shield. */
+function honeycombTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = c.height = 128;
+  const g = c.getContext("2d")!;
+  g.fillStyle = "rgba(255,255,255,0.18)";
+  g.fillRect(0, 0, 128, 128);
+  g.strokeStyle = "rgba(255,255,255,0.9)";
+  g.lineWidth = 3;
+  const r = 16;
+  const h = r * Math.sqrt(3);
+  for (let row = -1; row < 128 / h + 1; row++) {
+    for (let col = -1; col < 128 / (r * 1.5) + 1; col++) {
+      const cx = col * r * 1.5;
+      const cy = row * h + (col % 2 ? h / 2 : 0);
+      g.beginPath();
+      for (let k = 0; k < 6; k++) g.lineTo(cx + Math.cos((k * Math.PI) / 3) * r, cy + Math.sin((k * Math.PI) / 3) * r);
+      g.closePath();
+      g.stroke();
+    }
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  t.wrapS = t.wrapT = THREE.RepeatWrapping;
+  t.repeat.set(3, 2);
+  return t;
+}
+
+/** A band of flames, hot in the middle and fading at the edges, for the road on fire. */
+function flameTexture(): THREE.CanvasTexture {
+  const c = document.createElement("canvas");
+  c.width = 64;
+  c.height = 256;
+  const g = c.getContext("2d")!;
+  const across = g.createLinearGradient(0, 0, 64, 0);
+  across.addColorStop(0, "rgba(255,80,10,0)");
+  across.addColorStop(0.25, "rgba(255,110,20,0.75)");
+  across.addColorStop(0.5, "rgba(255,200,80,0.95)");
+  across.addColorStop(0.75, "rgba(255,110,20,0.75)");
+  across.addColorStop(1, "rgba(255,80,10,0)");
+  g.fillStyle = across;
+  g.fillRect(0, 0, 64, 256);
+  const rng = { rng: 5 };
+  for (let i = 0; i < 40; i++) {
+    g.fillStyle = `rgba(255,${200 + Math.floor(nextRandom(rng) * 55)},120,0.5)`;
+    g.beginPath();
+    g.ellipse(12 + nextRandom(rng) * 40, nextRandom(rng) * 256, 3 + nextRandom(rng) * 5, 6 + nextRandom(rng) * 10, 0, 0, Math.PI * 2);
+    g.fill();
+  }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
   return t;
 }
 

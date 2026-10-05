@@ -3,7 +3,7 @@ import { LEVELS_PER_WORLD, LEVEL_MODES, SHOP_FROM_LEVEL, campaignSpec, expectedU
 import { audio } from "./game/audio";
 import { Counter } from "./game/hud";
 import { Game, type RunResult } from "./game/Game";
-import { loadProgress, purchase, recordRun } from "./game/progress";
+import { loadProgress, purchase, recordRun, startedOver } from "./game/progress";
 import { Shop } from "./screens/Shop";
 import { MODE_INFO } from "./game/modes";
 import { lookFor } from "./game/themes";
@@ -31,7 +31,7 @@ export function App() {
   const play = (level: number) => setRun((r) => ({ level, id: (r?.id ?? 0) + 1 }));
   const onFinish = (r: RunResult) => setProgress((p) => recordRun(p, r.level, r.stars, r.coins));
 
-  if (run) return <Game key={run.id} level={run.level} upgrades={progress.upgrades} onFinish={onFinish} onPlay={play} onShop={() => { setRun(null); setShop(true); }} onExit={() => setRun(null)} />;
+  if (run) return <Game key={run.id} level={run.level} upgrades={progress.upgrades} record={{ wins: progress.wins[run.level] ?? 0, best: progress.stars[run.level] ?? 0 }} onFinish={onFinish} onPlay={play} onShop={() => { setRun(null); setShop(true); }} onExit={() => setRun(null)} />;
   if (shop) return <Shop progress={progress} onBuy={(kind) => setProgress((p) => purchase(p, kind))} onBack={() => setShop(false)} />;
   return <Home progress={progress} onPlay={play} onShop={() => setShop(true)} />;
 }
@@ -59,6 +59,8 @@ function Home({ progress, onPlay, onShop }: { progress: ReturnType<typeof loadPr
   const owned = progress.upgrades.damage + progress.upgrades.squad + progress.upgrades.armor;
   const want = expectedUpgrades(next);
   const behind = next >= SHOP_FROM_LEVEL ? Math.max(0, want.damage + want.squad + want.armor - owned) : 0;
+  // a save from an older version was wiped: say why the player is back at level 1, until they close it or play
+  const [news, setNews] = useState(startedOver && next === 1);
   useEffect(() => audio.playMusic("menu"), []);
   const worlds = Array.from({ length: MAP_LEVELS / LEVELS_PER_WORLD }, (_, w) => w);
   return (
@@ -73,6 +75,13 @@ function Home({ progress, onPlay, onShop }: { progress: ReturnType<typeof loadPr
           🪙 <Counter value={progress.coins} />
         </div>
       </header>
+
+      {news && (
+        <button className="readiness news" onClick={() => setNews(false)}>
+          <b>🆕 Versão nova: cada chefão ataca do seu jeito</b>
+          <span>Mísseis, barris explosivos, escudo com laser, gelo e chuva de meteoros. Por isso o progresso de todo mundo recomeçou da fase 1. Toque para fechar.</span>
+        </button>
+      )}
 
       {behind > 0 && (
         <button className="readiness" onClick={onShop}>

@@ -1,13 +1,14 @@
 import { Counter } from "../game/hud";
 import { ARMOR_PER_LEVEL, COINS_PER_LEVEL, DAMAGE_PER_LEVEL, SQUAD_PER_LEVEL, UPGRADE_KINDS, UPGRADE_MAX_LEVEL, upgradeCost, type UpgradeKind } from "@squadx/engine";
 import type { Progress } from "../game/progress";
+import { UPGRADE_LABEL } from "../game/names";
 
 /** How each upgrade is named and what a level of it does, in the player's words. */
 const INFO: Record<UpgradeKind, { name: string; icon: string; effect: (level: number) => string }> = {
-  damage: { name: "Dano", icon: "💥", effect: (l) => `+${Math.round(DAMAGE_PER_LEVEL * l * 100)}% de dano em tudo que atira` },
-  squad: { name: "Reforços", icon: "🪖", effect: (l) => `+${SQUAD_PER_LEVEL * l} soldado${SQUAD_PER_LEVEL * l === 1 ? "" : "s"} no começo de cada fase` },
-  armor: { name: "Resistência", icon: "🛡️", effect: (l) => `${Math.round(ARMOR_PER_LEVEL * l * 100)}% menos baixas por inimigos, armadilhas e bombas` },
-  coins: { name: "Butim", icon: "🪙", effect: (l) => `+${Math.round(COINS_PER_LEVEL * l * 100)}% de moedas por fase` },
+  damage: { ...UPGRADE_LABEL.damage, effect: (l) => `+${Math.round(DAMAGE_PER_LEVEL * l * 100)}% de dano em tudo que atira` },
+  squad: { ...UPGRADE_LABEL.squad, effect: (l) => `+${SQUAD_PER_LEVEL * l} soldado${SQUAD_PER_LEVEL * l === 1 ? "" : "s"} no começo de cada fase` },
+  armor: { ...UPGRADE_LABEL.armor, effect: (l) => `${Math.round(ARMOR_PER_LEVEL * l * 100)}% menos baixas por inimigos, armadilhas e bombas` },
+  coins: { ...UPGRADE_LABEL.coins, effect: (l) => `+${Math.round(COINS_PER_LEVEL * l * 100)}% de moedas por fase` },
 };
 
 /** The shop: spend coins on permanent upgrades. */

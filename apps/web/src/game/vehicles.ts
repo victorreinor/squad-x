@@ -155,7 +155,7 @@ export const HOVER: Record<VehicleKind, number> = { moto: 0, tank: 0, heli: 1.9 
 
 /** Seconds between two shots of a vehicle, and the colour and thickness of its tracer. */
 export const VEHICLE_SHOT: Record<VehicleKind, { gap: number; color: number; thick: number }> = {
-  moto: { gap: 0.16, color: 0xfff1a8, thick: 2 },
+  moto: { gap: 0.16, color: 0xffc83a, thick: 2 },
   heli: { gap: 0.11, color: 0xffd36b, thick: 2.6 },
   tank: { gap: 0.32, color: 0xff9a3c, thick: 3 },
 };

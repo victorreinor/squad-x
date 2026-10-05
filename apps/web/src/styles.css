@@ -166,10 +166,8 @@ h2,
   color: var(--gold);
 }
 .slam-warning {
-  position: absolute;
-  left: 50%;
-  top: 17%;
-  transform: translateX(-50%);
+  display: table;
+  margin: 8px auto 0;
   padding: 6px 16px;
   border-radius: 99px;
   border: 3px solid var(--ink);
@@ -177,6 +175,13 @@ h2,
   font-size: 20px;
   white-space: nowrap;
   animation: blink 0.35s steps(2) infinite;
+}
+.slam-warning.fire {
+  background: #e0641a;
+}
+.slam-warning.ice {
+  background: #2f8fd8;
+  animation: none;
 }
 @keyframes blink {
   50% {
@@ -405,6 +410,84 @@ h2,
   top: -9px;
   font-size: 22px;
 }
+/* the boss's health takes the place of the track: the red drops at once, the pale trail behind it a moment later */
+.boss-bar {
+  position: relative;
+  margin-top: 6px;
+  height: 24px;
+  border-radius: 99px;
+  border: 3px solid var(--ink);
+  background: rgba(10, 14, 28, 0.72);
+  overflow: hidden;
+  animation: boss-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both;
+}
+.boss-bar-fill,
+.boss-bar-trail {
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+}
+.boss-bar-fill {
+  background: linear-gradient(#ff7a5c, #d2362f 55%, #9e1f1a);
+  transition: width 0.12s linear;
+}
+.boss-bar-trail {
+  background: #ffe2a8;
+  transition: width 0.5s ease-in 0.35s;
+}
+@media (prefers-reduced-motion: reduce) {
+  .boss-bar-fill,
+  .boss-bar-trail {
+    transition: none;
+  }
+}
+/* where the boss turns furious, and the bar once it has */
+.boss-bar-notch {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 3px;
+  margin-left: -1.5px;
+  background: var(--ink);
+  opacity: 0.8;
+}
+.boss-bar.enraged {
+  border-color: #5a0d0a;
+  animation: boss-in 0.45s cubic-bezier(0.2, 1.4, 0.4, 1) both, fury 0.6s ease-in-out infinite alternate;
+}
+.boss-bar.enraged .boss-bar-fill {
+  background: linear-gradient(#ffb03a, #ff3a1a 55%, #b0140c);
+}
+@keyframes fury {
+  to {
+    box-shadow: 0 0 14px rgba(255, 60, 30, 0.85);
+  }
+}
+.boss-bar-name,
+.boss-bar-hp {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 1.5px 0 var(--ink), 1.5px 0 0 var(--ink), -1.5px 0 0 var(--ink), 0 -1.5px 0 var(--ink);
+}
+.boss-bar-name {
+  left: 10px;
+  text-transform: uppercase;
+}
+.boss-bar-hp {
+  right: 10px;
+  font-variant-numeric: tabular-nums;
+}
+@keyframes boss-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0.4);
+  }
+}
 .popup {
   position: absolute;
   left: 50%;
@@ -500,6 +583,37 @@ h2,
   .stars span {
     animation-duration: 0.01s;
   }
+}
+
+/* ---- boss arena (?chefao=yeti): the bar that picks the boss and who plays ---- */
+.arena-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 6px;
+  padding: 8px 10px calc(8px + env(safe-area-inset-bottom, 0px));
+  background: rgba(11, 20, 38, 0.82);
+  backdrop-filter: blur(4px);
+  z-index: 5;
+}
+.arena-pick {
+  padding: 6px 11px;
+  border-radius: 99px;
+  border: 2px solid var(--ink);
+  background: rgba(60, 80, 120, 0.85);
+  font-family: system-ui, sans-serif;
+  font-weight: 800;
+  font-size: 12.5px;
+}
+.arena-pick.on {
+  background: var(--red);
+}
+.arena-pick.who {
+  background: rgba(63, 156, 42, 0.9);
 }
 
 /* ---- gallery (?galeria=1) ---- */
@@ -659,6 +773,13 @@ h2,
   line-height: 1.2;
   animation: feed-in 0.35s cubic-bezier(0.2, 1.2, 0.4, 1) both, feed-out 0.4s ease-in 2.8s forwards;
 }
+.feed-count {
+  margin-left: 2px;
+  padding: 0 6px;
+  border-radius: 99px;
+  background: rgba(255, 255, 255, 0.16);
+  font-size: 12px;
+}
 .feed-item.good {
   border-left-color: #5fd68a;
 }
@@ -725,6 +846,7 @@ h2,
 .report dd {
   margin: 0;
   font-weight: 900;
+  white-space: nowrap;
 }
 .report .good {
   color: #7dffa6;
@@ -762,6 +884,12 @@ h2,
   text-align: left;
   animation: pulse-border 1.8s ease-in-out infinite;
 }
+/* the one-time notice after an update wiped the saves: blue, calm, no pulsing */
+.readiness.news {
+  border-color: #3f8cff;
+  background: linear-gradient(#1d3f7a, #12284f);
+  animation: none;
+}
 .readiness b {
   font-size: 15px;
 }
@@ -784,6 +912,7 @@ h2,
   .card,
   .chip,
   .feed-item,
+  .boss-bar,
   .report > div,
   .readiness {
     animation-duration: 0.01s !important;

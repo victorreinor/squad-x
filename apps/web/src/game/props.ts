@@ -67,3 +67,60 @@ export function bombParts(): PartSpec[] {
     S(0.08, [0, 0.12, 0], 0xff3a2a, { glow: true, ink: false }),
   ];
 }
+
+/**
+ * The General's missile: an olive body along z with a red warhead pointing at the squad (-z), four fins at the tail
+ * and a flame out of the back.
+ */
+export function missileParts(): PartSpec[] {
+  const olive = 0x5d6b3a;
+  const parts: PartSpec[] = [
+    C(0.22, 0.22, 1.5, [0, 0, 0], olive, { rot: alongZ }),
+    K(0.22, 0.5, [0, 0, -1], RED, { rot: [-PI / 2, 0, 0] }),
+    B([0.46, 0.04, 0.05], [0, 0, -0.4], 0xf2c94c, { ink: false }),
+    C(0.16, 0.2, 0.2, [0, 0, 0.84], STEEL, { rot: alongZ }),
+    S(0.2, [0, 0, 1.05], 0xffb03a, { glow: true, ink: false, scale: [1, 1, 1.8] }),
+    S(0.12, [0, 0, 1.2], 0xfff1b0, { glow: true, ink: false, scale: [1, 1, 1.6] }),
+  ];
+  for (let i = 0; i < 4; i++) {
+    const a = (i / 4) * PI * 2 + PI / 4;
+    parts.push(B([0.04, 0.34, 0.36], [Math.cos(a) * 0.3, Math.sin(a) * 0.3, 0.55], STEEL, { rot: [0, 0, a - PI / 2] }));
+  }
+  return parts;
+}
+
+/** How far the keg's axle is off the road (units, before scaling): the model is built around its axle so it can roll. */
+export const KEG_AXLE = 0.6;
+
+/** The Warlord's explosive keg: a red barrel lying across the road around its axle, with yellow hazard bands and a lit fuse. */
+export function kegParts(): PartSpec[] {
+  const side: [number, number, number] = [0, 0, PI / 2];
+  return [
+    C(0.6, 0.6, 1.1, [0, 0, 0], 0xc8322c, { rot: side }),
+    C(0.63, 0.63, 0.12, [-0.38, 0, 0], 0xf2c94c, { rot: side }),
+    C(0.63, 0.63, 0.12, [0.38, 0, 0], 0xf2c94c, { rot: side }),
+    C(0.5, 0.5, 0.04, [-0.56, 0, 0], 0x7a1e1a, { rot: side, ink: false }),
+    C(0.5, 0.5, 0.04, [0.56, 0, 0], 0x7a1e1a, { rot: side, ink: false }),
+    // a flame mark on the side the squad sees, and the fuse sticking out of one end
+    K(0.16, 0.34, [0, 0.02, -0.6], 0xffd23a, { ink: false, rot: [-0.1, 0, 0] }),
+    C(0.03, 0.03, 0.3, [0.66, 0.18, 0], 0x2a2a2a, { rot: [0, 0, -0.9] }),
+    S(0.09, [0.78, 0.28, 0], 0xffd06a, { glow: true, ink: false }),
+  ];
+}
+
+/** The Demon's meteor: a lump of dark rock with glowing cracks. The scene gives it its trail of fire as it falls. */
+export function meteorParts(): PartSpec[] {
+  const rock = 0x3a2a26;
+  const lava = 0xff6a1a;
+  return [
+    S(0.62, [0, 0.6, 0], rock, { scale: [1, 0.92, 1.05] }),
+    S(0.3, [0.42, 0.85, 0.1], rock),
+    S(0.26, [-0.38, 0.4, -0.2], rock),
+    ...[
+      [0.2, 0.95, -0.52],
+      [-0.4, 0.75, -0.4],
+      [0.5, 0.45, -0.3],
+      [-0.1, 0.3, -0.56],
+    ].map(([x, y, z]) => S(0.11, [x, y, z], lava, { glow: true, ink: false })),
+  ];
+}

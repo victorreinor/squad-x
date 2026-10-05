@@ -1,6 +1,7 @@
 import * as THREE from "three";
-import type { EnemyKind, WeaponKind } from "@squadx/engine";
+import type { BossKind, EnemyKind, WeaponKind } from "@squadx/engine";
 import type { FigureSpec, PartSpec, Role } from "./crowd";
+import { BOSS_NAME } from "./names";
 
 /**
  * Every character of the game, built from simple shapes. A figure stands with its feet at the origin, about 1.35 tall,
@@ -736,12 +737,12 @@ function demonFigure(): FigureSpec {
   return { parts, pivots: BOSS_PIVOTS, legSwing: 0.3, armL: { base: 0.75, swing: 0.3 }, armR: { base: 0.75, swing: 0.3 } };
 }
 
-/** The boss of each world, in the order the worlds appear, and how big it is drawn. */
-export const BOSS_FIGURES: { name: string; figure: () => FigureSpec }[] = [
-  { name: "General", figure: generalFigure },
-  { name: "Senhor da Guerra", figure: warlordFigure },
-  { name: "Mecha", figure: mechFigure },
-  { name: "Yeti", figure: yetiFigure },
-  { name: "Demônio", figure: demonFigure },
-];
+/** Each boss's figure and the name it shows, and how big it is drawn. */
+export const BOSS_FIGURES: Record<BossKind, { name: string; figure: () => FigureSpec }> = {
+  general: { name: BOSS_NAME.general, figure: generalFigure },
+  warlord: { name: BOSS_NAME.warlord, figure: warlordFigure },
+  mech: { name: BOSS_NAME.mech, figure: mechFigure },
+  yeti: { name: BOSS_NAME.yeti, figure: yetiFigure },
+  demon: { name: BOSS_NAME.demon, figure: demonFigure },
+};
 export const BOSS_SCALE = 3.4;

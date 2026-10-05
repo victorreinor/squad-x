@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { ARMOR_PER_LEVEL, DAMAGE_PER_LEVEL, SQUAD_PER_LEVEL, type GameState, type Upgrades } from "@squadx/engine";
+import { ARMOR_PER_LEVEL, BOSS_FURY_AT, DAMAGE_PER_LEVEL, SQUAD_PER_LEVEL, type GameState, type Upgrades } from "@squadx/engine";
 import type { FeedItem } from "./feed";
 import { VEHICLE_LABEL, WEAPON_LABEL } from "./names";
 
@@ -59,14 +59,34 @@ export function StatusStrip({ state, upgrades }: { state: Pick<GameState["squad"
   );
 }
 
+/**
+ * The boss's health, in place of the progress track while it is in sight: a red bar with a pale trail that drains a
+ * moment later, so each burst of fire shows how much it took. A notch marks where it turns furious, and then the bar
+ * burns brighter.
+ */
+export function BossBar({ name, hp, max, enraged }: { name: string; hp: number; max: number; enraged: boolean }) {
+  const left = `${Math.max(0, Math.min(1, hp / max)) * 100}%`;
+  const shown = Math.max(0, Math.ceil(hp));
+  return (
+    <div className={`boss-bar ${enraged ? "enraged" : ""}`} role="meter" aria-label={`Vida do ${name}`} aria-valuemin={0} aria-valuemax={max} aria-valuenow={shown}>
+      <div className="boss-bar-trail" style={{ width: left }} />
+      <div className="boss-bar-fill" style={{ width: left }} />
+      <div className="boss-bar-notch" style={{ left: `${BOSS_FURY_AT * 100}%` }} />
+      <span className="boss-bar-name">{enraged ? "😡" : "☠"} {name}</span>
+      <span className="boss-bar-hp">{shown.toLocaleString("pt-BR")}</span>
+    </div>
+  );
+}
+
 /** The messages about what just happened, stacking down the left side and fading after a few seconds. */
-export function Feed({ items }: { items: (FeedItem & { id: number })[] }) {
+export function Feed({ items }: { items: (FeedItem & { id: number; count: number })[] }) {
   return (
     <ul className="feed" aria-live="polite">
       {items.map((item) => (
         <li key={item.id} className={`feed-item ${item.tone}`}>
           <span aria-hidden>{item.icon}</span>
           {item.text}
+          {item.count > 1 && <b className="feed-count">×{item.count}</b>}
         </li>
       ))}
     </ul>
