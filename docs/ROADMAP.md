@@ -99,6 +99,7 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [x] Joga sem internet depois da primeira visita: o service worker guarda o jogo inteiro (~1,1 MB); a versão nova baixa em segundo plano e entra na abertura seguinte, sem recarregar a página no meio de uma fase
 - [x] `vercel.json` para a Vercel montar o cliente (o mesmo esquema do Bomb Arena, sem servidor)
 - [x] Versão do save: uma versão nova pode zerar o progresso de todo mundo, com aviso no menu (usado na versão dos chefões novos)
+- [x] Botão "Recomeçar do zero" no fim do menu, que pergunta antes de apagar fases, estrelas, moedas e melhorias (o som fica como está). Só aparece quando há algo para apagar
 - [x] Publicado em https://squad-x-web-inky.vercel.app (a cada push no `master`), com o endereço no README, no `CLAUDE.md` e no "About" do GitHub, junto com a descrição e os tópicos do repositório
 
 **Documentação e licença**
