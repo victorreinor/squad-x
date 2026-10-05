@@ -1,0 +1,21 @@
+{
+  "name": "squad-x",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev": "bun run --cwd apps/web dev",
+    "build": "bun run --cwd apps/web build",
+    "test": "bun test packages",
+    "typecheck": "tsc -p packages/engine --noEmit && tsc -p apps/web --noEmit",
+    "calibrate": "bun tools/calibrate.ts"
+  },
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.6.0"
+  }
+}
