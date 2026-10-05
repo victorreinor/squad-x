@@ -12,10 +12,11 @@ import {
   STAR_COINS,
   levelReward,
   lossMultiplier,
+  REFUNDABLE,
   refundUpgrades,
+  refundValue,
   runPayout,
   upgradeCost,
-  upgradesWorth,
 } from "../src";
 import { emptyLevel, run } from "./helpers";
 
@@ -70,13 +71,16 @@ describe("upgrades", () => {
     expect(buyUpgrade({ ...NO_UPGRADES, squad: UPGRADE_MAX_LEVEL }, 1e9, "squad")).toBeNull();
   });
 
-  test("a refund takes every upgrade back for what it cost: the wallet is as if nothing had been bought", () => {
+  test("a refund takes back damage, reinforcements and armour for what they cost, and leaves the coin upgrade bought", () => {
     const start = 5000;
     let shopped = { upgrades: { ...NO_UPGRADES }, wallet: start };
-    for (const kind of ["damage", "damage", "squad", "armor", "coins", "damage"] as const) shopped = buyUpgrade(shopped.upgrades, shopped.wallet, kind)!;
-    expect(shopped.wallet).toBeLessThan(start);
-    expect(upgradesWorth(shopped.upgrades)).toBe(start - shopped.wallet);
-    expect(refundUpgrades(shopped.upgrades, shopped.wallet)).toEqual({ upgrades: NO_UPGRADES, wallet: start });
+    for (const kind of ["damage", "damage", "squad", "coins", "armor", "coins", "damage"] as const) shopped = buyUpgrade(shopped.upgrades, shopped.wallet, kind)!;
+    const coinUpgrade = upgradeCost("coins", 0) + upgradeCost("coins", 1);
+    expect(shopped.wallet).toBeLessThan(start - coinUpgrade);
+    expect(refundValue(shopped.upgrades)).toBe(start - coinUpgrade - shopped.wallet);
+    // the coin upgrade would pay its bonus and then its price back: it stays, and its price stays spent
+    expect(refundUpgrades(shopped.upgrades, shopped.wallet)).toEqual({ upgrades: { ...NO_UPGRADES, coins: 2 }, wallet: start - coinUpgrade });
+    expect(REFUNDABLE).not.toContain("coins");
   });
 
   test("a first win pays the level's reward, its stars and what was picked up, all raised by the coin upgrade", () => {

@@ -73,16 +73,24 @@ export function buyUpgrade(owned: Upgrades, wallet: number, kind: UpgradeKind): 
  */
 export const SHOP_REFUNDS = 2;
 
-/** The coins spent to own `owned`: what a refund gives back, in full. */
-export function upgradesWorth(owned: Upgrades): number {
+/**
+ * What a refund takes back. The coin upgrade stays bought: refunded, it would pay its bonus for a stretch of levels and
+ * then its price back, a free investment.
+ */
+export const REFUNDABLE: readonly UpgradeKind[] = ["damage", "squad", "armor"];
+
+/** The coins spent on the `REFUNDABLE` upgrades of `owned`: what a refund gives back, in full. */
+export function refundValue(owned: Upgrades): number {
   let worth = 0;
-  for (const kind of UPGRADE_KINDS) for (let level = 0; level < owned[kind]; level++) worth += upgradeCost(kind, level);
+  for (const kind of REFUNDABLE) for (let level = 0; level < owned[kind]; level++) worth += upgradeCost(kind, level);
   return worth;
 }
 
-/** Every upgrade taken back for what it cost: no upgrades, and the wallet as if nothing had been bought. */
+/** The `REFUNDABLE` upgrades taken back for what they cost: back to level 0, and their price back in the wallet. */
 export function refundUpgrades(owned: Upgrades, wallet: number): { upgrades: Upgrades; wallet: number } {
-  return { upgrades: { ...NO_UPGRADES }, wallet: wallet + upgradesWorth(owned) };
+  const upgrades = { ...owned };
+  for (const kind of REFUNDABLE) upgrades[kind] = 0;
+  return { upgrades, wallet: wallet + refundValue(owned) };
 }
 
 /** The first level that cannot be beaten without visiting the shop. */
