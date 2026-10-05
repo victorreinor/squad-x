@@ -46,7 +46,7 @@ Tudo é original: cada soldado, monstro, arma e som sai de código. Nenhum model
 
 ### O esquadrão
 
-Visto de costas, que é como você o enxerga no jogo: capacete grande com aba, colete com placas, mochila com rolo de dormir, pá e cantil. Até 126 aparecem na tela; o número em cima do grupo mostra o total real.
+Visto de costas, que é como você o enxerga no jogo: capacete grande com aba, colete com placas, mochila com rolo de dormir, pá e cantil. Conforme o grupo cresce, os soldados diminuem e se apertam para o bloco não cobrir a pista; até 180 aparecem na tela, e o número em cima do grupo mostra o total real.
 
 <p align="center">
   <img src=".github/readme/soldado.png" alt="O soldado de costas e de frente, com pistola, fuzil, submetralhadora e minigun" width="100%">
@@ -138,6 +138,7 @@ A tela sempre diz o que você tem (soldados, arma, veículos, melhorias) e o que
 | Cliente | React 19 + Vite 7 para as telas e o HUD; a partida é desenhada em Three.js |
 | Arte | Montada por código a partir de formas simples, com sombreamento "toon" e contorno preto |
 | Som | Sintetizado em tempo real com Web Audio, sem nenhum arquivo de áudio |
+| Instalação | PWA: manifesto e service worker (`vite-plugin-pwa`); depois da primeira visita, joga sem internet |
 | Fases | Geradas por semente e calibradas por simulação (`bun run calibrate`) |
 | Testes | `bun test`: 81 testes, incluindo o equilíbrio das fases com e sem loja |
 
@@ -167,6 +168,7 @@ Algumas escolhas que fazem diferença:
 - **A engine não conhece o desenho.** Sons, partículas, tremor e os avisos na tela saem da diferença entre dois estados. Trocar o visual não mexe nas regras nem nos testes.
 - **Determinismo.** Nada de `Math.random()` nas regras: o acaso vem de um gerador com semente, então todo bug vira um teste que se repete.
 - **Muitos bonecos, poucas chamadas de desenho.** Centenas de soldados e inimigos saem de `InstancedMesh`, com as peças de mesma cor fundidas e um contorno por trás.
+- **Detalhe na medida do tamanho na tela.** Na partida, cada forma redonda tem só os lados que a deixam a menos de um pixel da curva, o soldado não leva o que só aparece de frente, e o esquadrão grande usa um soldado mais leve. Se mesmo assim o aparelho não acompanha, a imagem fica um pouco mais suave em vez de o jogo ficar lento.
 - **Fase dimensionada pelo esquadrão medido.** Um bot joga a fase, e o quanto o esquadrão cresce a cada metro da pista dimensiona hordas, barris e números dos portais. Antes o gerador chutava, e errava por muito.
 - **Nada de simulação no celular.** O resultado da calibração fica numa tabela gerada.
 
@@ -204,14 +206,21 @@ Atalhos na URL para testar:
 | `bun run typecheck` | Checagem de tipos da engine e do cliente |
 | `bun run build` | Build de produção do cliente |
 | `bun run calibrate` | Joga as 50 fases com bots e regrava a tabela de dificuldade |
+| `bun run icons` | Redesenha os ícones do app (aba do navegador e tela inicial) |
 
 Mexeu em regra, gerador, bot ou loja? Rode `bun run calibrate` e depois `bun run test`.
+
+## 📲 Instalar e publicar
+
+O jogo é um PWA: no Android o Chrome oferece "Instalar app"; no iPhone é Compartilhar → "Adicionar à Tela de Início". Depois da primeira visita ele abre e joga sem internet, e uma versão nova baixa em segundo plano e aparece na abertura seguinte. O progresso fica só no aparelho.
+
+Instalar e jogar offline exigem HTTPS, então não valem pelo `http://<IP>:5183` do desenvolvimento: o service worker só existe no build de produção. Para publicar, o `vercel.json` já diz à [Vercel](https://vercel.com) como montar o cliente (free tier, sem servidor); basta importar o repositório.
 
 ## 📁 Estrutura
 
 - `packages/engine`: regras, gerador de fases, bots, loja e calibração
 - `apps/web`: cliente em React + Three.js (cena, personagens, cenários, interface, som)
-- `tools`: o script de calibração
+- `tools`: os scripts de calibração e dos ícones
 - `docs`: arquitetura, decisões, roadmap e a folha de referência visual
 
 Vai trabalhar no código com um agente de IA? As instruções estão em [CLAUDE.md](CLAUDE.md) (o [AGENTS.md](AGENTS.md) aponta para ele).

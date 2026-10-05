@@ -24,10 +24,11 @@ Use Bun (`bun install`) e o Node do `.nvmrc`. Rode tudo a partir da raiz.
 | `bun run typecheck` | `tsc` na engine e no cliente |
 | `bun run build` | Build de produção do cliente |
 | `bun run calibrate` | Joga as 50 fases com bots e regrava `packages/engine/src/pressures.ts`. Rode sempre que mexer em regras, gerador, bots ou loja. `bun run calibrate 50 3,4` recalibra só algumas |
+| `bun run icons` | Redesenha os ícones do app em `apps/web/public/icons` (os PNGs ficam no repositório) |
 
 Atalhos na URL (só para olhar e testar): `?bot=1` deixa o bot da engine jogar a fase sozinho (selo 🤖 BOT); `?galeria=1` abre a galeria dos modelos (abas, arraste para girar, botão "ângulo do jogo").
 
-No celular: computador e celular na mesma Wi-Fi, `http://<IP do Mac>:5183` (IP em `ipconfig getifaddr en0`). `localhost` no celular é o próprio celular.
+No celular: computador e celular na mesma Wi-Fi, `http://<IP do Mac>:5183` (IP em `ipconfig getifaddr en0`). `localhost` no celular é o próprio celular. Instalar como app e jogar offline não valem por esse endereço: exigem HTTPS e o build de produção.
 
 ## Estrutura
 
@@ -39,10 +40,12 @@ No celular: computador e celular na mesma Wi-Fi, `http://<IP do Mac>:5183` (IP e
   - `bot.ts`: jogadores para os testes e para a calibração (`SKILLED_BOT`, `AVERAGE_BOT`; "parado" é `IDLE`).
   - `constants.ts`: todo número ajustável, com unidade no comentário.
 - `apps/web` (`@squadx/web`): React 19 + Vite + Three.js. O React cuida do menu, da loja e do HUD; a partida roda num loop de `requestAnimationFrame` com passo fixo.
-  - `game/scene.ts`: a cena 3D inteira, desenhada a partir do `GameState`; `scenery.ts` (ponte, barreiras, cidade, deserto, neve, vulcão, horizonte), `figures.ts` (soldado, inimigos, chefões, armas, a partir de peças), `crowd.ts` (desenha centenas de figuras com `InstancedMesh` e contorno), `vehicles.ts`, `props.ts` (espinhos, mina, bombardeiro, bomba), `themes.ts`.
+  - `game/scene.ts`: a cena 3D inteira, desenhada a partir do `GameState`; `scenery.ts` (ponte, barreiras, cidade, deserto, neve, vulcão, horizonte), `figures.ts` (soldado, inimigos, chefões, armas, a partir de peças), `crowd.ts` (desenha centenas de figuras com `InstancedMesh` e contorno), `formation.ts` (como o esquadrão se arruma e encolhe), `sharpness.ts` (nitidez que se adapta ao aparelho), `vehicles.ts`, `props.ts` (espinhos, mina, bombardeiro, bomba), `themes.ts`.
   - `game/Game.tsx` (loop, entrada, HUD, relatório), `hud.tsx` (painel, contadores, avisos), `feed.ts` (avisos do que aconteceu), `audio.ts` e `sfx.ts` (som sintetizado), `progress.ts` (`localStorage`), `modes.ts` e `names.ts` (textos).
   - `Gallery.tsx`: a galeria dos modelos (`?galeria=1`).
-- `tools/calibrate.ts`: o script do `bun run calibrate`.
+  - `public/manifest.webmanifest` e `public/icons`: o que faz o jogo ser instalável (PWA). O service worker que o deixa jogar offline é gerado no build pelo `vite-plugin-pwa` (`vite.config.ts`).
+- `tools/calibrate.ts`: o script do `bun run calibrate`. `tools/make-icons.ts`: o do `bun run icons`.
+- `vercel.json`: como a Vercel monta o cliente. Não há servidor.
 - `docs`: arquitetura, decisões, roadmap e a folha de referência visual.
 - `.github/readme`: as figuras do README (capturas do jogo e da galeria).
 
@@ -89,8 +92,12 @@ No celular: computador e celular na mesma Wi-Fi, `http://<IP do Mac>:5183` (IP e
 - **O chefão não se mexe.** Fica parado na pista e bloqueia o avanço a 14 unidades. A linha de chegada fica depois dele. Os lacaios entram em `state.enemies` durante o passo, por isso a lista é reconstruída à mão (um `filter` os derrubaria).
 - **Bombas caem em volta de um corredor seguro**, não perto do esquadrão. Antes caíam onde ele estava e era impossível fugir de todas.
 - **Instâncias do Three.** Cada papel do boneco (`legL`, `armR`, `gun`…) é uma camada de `InstancedMesh`; `setGun` troca só a camada da arma. Peças de mesma cor são fundidas (`mergeGeometries`). O contorno é a mesma peça virada do avesso e 14% maior.
+- **O boneco da partida não é o da galeria.** A partida usa `runSoldier`, `runGun` e `runEnemy` (formas redondas com menos lados, via `cut`); a galeria usa `soldierFigure` e `ENEMY_LOOKS[k].figure()` inteiros. No soldado, peça que só aparece de frente leva `skip: "front"` e peça miúda leva `skip: "fine"`: sem a marca, ela é desenhada em todos os soldados da tela. Antes de mexer em bonecos, conte os triângulos: o soldado inteiro tem ~7,6 mil e já chegou a dar 1 milhão por quadro.
+- **A largura do esquadrão é da engine, a profundidade é do desenho.** `squadFormation` mantém a largura das colunas de tiro (as regras a usam para armadilhas e bombas) e encolhe os soldados para a profundidade não passar de 4 unidades. Com o esquadrão encolhido, os bonecos deixam de coincidir com as colunas de tiro, e tudo bem.
 - **A câmera passa por cima do cenário.** Torres da ponte e afins precisam ser altas (as travessas ficam acima de ~30 unidades), senão cobrem a tela.
 - **Aba escondida do Chrome pausa o jogo.** Para tirar screenshots, use um Chrome headless à parte (`puppeteer-core` com `--use-gl=angle --use-angle=swiftshader`); a aba de uma janela atrás de outra roda parada.
+- **Service worker só no build de produção.** O `bun run dev` não tem cache nenhum. No build, a versão nova baixa em segundo plano e só aparece na abertura seguinte: para conferir um deploy, abra duas vezes. Nada recarrega a página sozinho, de propósito (um deploy não pode reiniciar uma fase).
+- **Dividir o bundle mexe com o offline.** Enquanto o jogo é um script só, a página aberta não pede mais nada. Com `import()` dinâmico, a página que roda a versão antiga pode pedir um arquivo que o service worker novo já apagou; resolva isso antes (veja `docs/DECISIONS.md`).
 - O teste que passa "à toa" já aconteceu: compare com o valor inicial, e não com zero.
 
 ## Onde mexer
@@ -106,7 +113,11 @@ No celular: computador e celular na mesma Wi-Fi, `http://<IP do Mac>:5183` (IP e
 | Veículos, espinhos, mina, avião, bomba | `vehicles.ts`, `props.ts` |
 | Cenários e clima de cada mundo | `scenery.ts`, `themes.ts` |
 | A cena, efeitos de tiro e explosão, câmera | `apps/web/src/game/scene.ts` |
+| Quantos soldados aparecem, de que tamanho, e quando entra o soldado leve | `apps/web/src/game/formation.ts` |
+| Quando a imagem fica mais suave ou mais nítida | `apps/web/src/game/sharpness.ts` |
 | Menu, loja, relatório, HUD | `App.tsx`, `screens/Shop.tsx`, `game/Game.tsx`, `hud.tsx` |
 | Textos dos avisos | `game/feed.ts` |
 | Sons e música | `game/audio.ts`, `game/sfx.ts` |
 | Figuras do README | `.github/readme` (capturas; refazer quando o visual mudar muito) |
+| Ícone do app, nome e cores na tela inicial | `tools/make-icons.ts` (`bun run icons`) e `apps/web/public/manifest.webmanifest` |
+| O que fica guardado para jogar offline | `apps/web/vite.config.ts` (`VitePWA`) |

@@ -7,6 +7,8 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 
 **Primeiro: validar no celular**
 - [ ] Jogar de verdade no celular (Wi-Fi + `http://<IP>:5183`): arrastar, tamanho dos soldados e dos números, desempenho com centenas de bonecos, leitura dos avisos — P
+- [ ] Medir os quadros por segundo num celular de verdade, com esquadrão cheio e horda na tela: as contas de triângulos foram feitas no Mac, e é o celular que diz se bastou — P
+- [ ] Inimigos distantes mais leves: a horda nasce a 42 unidades, onde cada inimigo tem poucos pixels, mas é desenhada com o boneco inteiro (~2 a 4,6 mil triângulos cada). Hoje o pico de uma partida (~470 mil) é uma horda longe. Dá para usar a mesma ideia do soldado leve, escolhendo pela distância — M
 - [ ] Ajustar o que o teste no celular mostrar (câmera, sensibilidade do arrastar, tamanho do HUD) — M
 - [ ] Fase 1 mais gentil para quem erra portais: hoje só o bot "médio" perde nela — P 🎚️
 - [ ] Ouvir o som de verdade (hoje só confirmamos por contagem que dispara) e ajustar volume e timbre — P
@@ -22,13 +24,13 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 **Depois: acabamento**
 - [ ] Veículos mais vivos: rodas e esteiras girando, hélice com borrão, fumaça do escapamento — P
 - [ ] Soldado em poses diferentes (comemorando, caindo) para a tela de resultado — P
-- [ ] PWA instalável (manifesto e ícones): abre em tela cheia, como um app — M
-- [ ] Dividir o bundle: o Three.js passa de 700 kB e o total de 1 MB (a tabela de calibração pesa ~190 kB) — P
+- [ ] Dividir o bundle: o Three.js passa de 700 kB e o total de 1 MB (a tabela de calibração pesa ~190 kB). Cuidado com o service worker: com pedaços carregados depois, a página que ainda roda a versão antiga pode pedir um arquivo que a nova já apagou (veja `DECISIONS.md`) — P
 - [ ] Empacotar para a Play Store, quando o jogo estiver bom — G
 
 **Quando der: proteção e publicação**
 - [ ] CI no GitHub Actions: typecheck, testes e build a cada push — P
-- [ ] Publicar o cliente (Vercel, free tier) — P
+- [ ] Publicar o cliente: importar o repositório na Vercel (free tier; o `vercel.json` já está pronto) e pôr o endereço no README e no `CLAUDE.md` — P
+- [ ] Conferir no celular, já pelo endereço publicado (precisa de HTTPS): instalar na tela inicial, abrir em modo avião e receber uma versão nova — P
 - [ ] Aviso de erros em produção (Sentry ou similar, plano grátis; conferir os limites antes) — P
 
 ## Feito
@@ -64,11 +66,22 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [x] Som sintetizado (tiros, acertos, portais, barris, veículos, explosões, chefão, bombardeio, música do menu e da batalha) e botão de mudo
 - [x] Galeria `?galeria=1` para ver os modelos de perto e do ângulo do jogo
 
+**Desempenho**
+- [x] Esquadrão que encolhe para caber: a largura é a das colunas de tiro e a profundidade para em 4 unidades, então de ~50 soldados em diante os bonecos diminuem e as fileiras se apertam. O bloco ocupa o mesmo pedaço da tela com 54 ou com 999, e a pista à frente fica à vista. Antes eram 126 bonecos em tamanho cheio cobrindo a metade de baixo, em 29 das 50 fases
+- [x] Bonecos cortados pelo tamanho na tela: o soldado foi de ~7,6 mil triângulos para ~3,7 mil na partida e ~1,1 mil quando o esquadrão é grande; os inimigos, para cerca da metade. Na mesma cena, o quadro com 126 soldados caiu de ~1 milhão de triângulos para ~157 mil (com 999: ~234 mil). A galeria continua com o corte original
+- [x] Resolução adaptável: se os quadros demoram, a imagem fica um degrau mais suave (de 2 até 1 pixel por ponto, em três degraus) e volta quando sobra folga; um tranco passageiro se desfaz em ~13 s
+- [x] Multidão vazia não envia nada à placa de vídeo, e a cheia envia só o que usou
+
 **Interface**
 - [x] Painel do que você tem (soldados, arma, veículos, melhorias), avisos coloridos do que aconteceu e contadores que rolam
 - [x] Relatório da fase com a origem de cada moeda e o que derrubou o esquadrão; botão direto para a loja quando a fase pede melhorias
 - [x] Aviso no menu quando o jogador está atrás do esperado para a próxima fase
 - [x] Telas com transição, botões com resposta e tudo respeitando `prefers-reduced-motion`
+
+**Instalação e publicação**
+- [x] PWA instalável: manifesto, ícones desenhados por código (`bun run icons`), tela cheia e em pé
+- [x] Joga sem internet depois da primeira visita: o service worker guarda o jogo inteiro (~1,1 MB); a versão nova baixa em segundo plano e entra na abertura seguinte, sem recarregar a página no meio de uma fase
+- [x] `vercel.json` para a Vercel montar o cliente (o mesmo esquema do Bomb Arena, sem servidor)
 
 **Documentação e licença**
 - [x] Licença PolyForm Strict 1.0.0, com permissão extra para pull requests (a mesma do Bomb Arena)

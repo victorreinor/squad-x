@@ -91,9 +91,11 @@ O resultado vai para `pressures.ts`. Um teste recalibra três fases e confere co
 
 ### A cena (`scene.ts`)
 
-- Câmera alta, atrás do esquadrão, que recua quando o esquadrão tem muitas fileiras.
+- Câmera alta, atrás do esquadrão, que recua um pouco quando ele fica fundo.
+- Esquadrão: `formation.ts` (`squadFormation`) diz quantos soldados desenhar, de que tamanho e em quantas colunas. Pequeno, fica sobre as colunas de tiro, em tamanho cheio; grande, mantém a largura e limita a profundidade, com soldados menores e mais juntos. Abaixo de 90% do tamanho entra o soldado leve (uma segunda `Crowd`).
+- Nitidez: `sharpness.ts` mede os quadros e muda os pixels por ponto do renderer (de 2 até 1) quando o aparelho não acompanha.
 - Mundo: `scenery.ts` monta a ponte (torres, cabos, tirantes, água animada), as barreiras, o cenário de cada mundo, o horizonte e o clima (neve, brasas). `themes.ts` guarda as cores de cada mundo.
-- Personagens: `figures.ts` descreve cada figura como uma lista de peças (`PartSpec`, cada uma com um papel: `static`, `legL`, `legR`, `armL`, `armR`, `gun`). `crowd.ts` junta as peças de mesma cor, cria uma `InstancedMesh` por cor e papel, desenha o contorno preto (a mesma peça virada do avesso e 14% maior) e anima pernas e braços em torno das juntas.
+- Personagens: `figures.ts` descreve cada figura como uma lista de peças (`PartSpec`, cada uma com um papel: `static`, `legL`, `legR`, `armL`, `armR`, `gun`). `crowd.ts` junta as peças de mesma cor, cria uma `InstancedMesh` por cor e papel, desenha o contorno preto (a mesma peça virada do avesso e 14% maior) e anima pernas e braços em torno das juntas. Na partida as figuras vêm de `runSoldier`, `runGun` e `runEnemy`, que cortam as formas redondas pelo tamanho na tela (`cut`) e deixam de fora as peças marcadas com `skip`; a galeria usa as figuras inteiras.
 - Efeitos: faíscas, clarões de cano, rastros luminosos (aditivos), bola de fogo com onda de choque e fumaça, tremor de câmera, poeira dos passos.
 - Portais: pórtico de aço com placa pendurada e pintura de setas no asfalto; placa com cadeado quando travada.
 - Perigos: espinhos, minas piscando, o avião cruzando o céu com sombra na pista, bombas caindo sobre as zonas vermelhas.
@@ -128,8 +130,16 @@ O resultado vai para `pressures.ts`. Um teste recalibra três fases e confere co
 
 **Novo mundo:** uma entrada em `THEMES` (`levels.ts`), `WORLD_ENEMIES`, um `ThemeLook` em `themes.ts`, o cenário em `scenery.ts` (`addWorld` e `addBackdrop`) e um chefão em `BOSS_FIGURES`; ajustar `MAP_LEVELS` em `App.tsx`.
 
+## Instalação e offline
+
+- `apps/web/public/manifest.webmanifest` e `public/icons` (gerados por `bun run icons`, a partir de `tools/make-icons.ts`) fazem o navegador oferecer a instalação; o `index.html` aponta para os dois.
+- O `vite-plugin-pwa` (em `vite.config.ts`) gera `sw.js` no build de produção, com a lista de tudo o que o build produziu. O service worker guarda esses arquivos na primeira visita e passa a responder por eles, com ou sem rede. O servidor de desenvolvimento não tem service worker.
+- Uma versão nova baixa em segundo plano, assume na hora e aparece na abertura seguinte. Nada recarrega a página sozinho.
+- `vercel.json` diz à Vercel como montar o cliente (`bun install`, `bun run build`, saída em `apps/web/dist`).
+
 ## Verificação
 
 - `bun run test`: regras, portais, armadilhas, bombardeio, inimigos, chefão, loja, geração de fases e equilíbrio (leva alguns segundos, com timeout explícito nos testes lentos).
 - `bun run typecheck` e `bun run build`.
+- PWA: `bun run build`, depois `cd apps/web && bunx vite preview --port 5185 --strictPort` e, num Chrome à parte, conferir que não há erro de instalação, recarregar sem rede e simular um deploy (mudar algo, gerar o build de novo e abrir duas vezes).
 - No navegador: `?bot=1` deixa o bot jogar para você olhar uma fase; `?galeria=1` mostra os modelos de perto. Confira sempre do ângulo da câmera do jogo, em tamanho de celular.
