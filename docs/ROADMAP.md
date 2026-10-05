@@ -100,7 +100,7 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [x] `vercel.json` para a Vercel montar o cliente (o mesmo esquema do Bomb Arena, sem servidor)
 - [x] Versão do save: uma versão nova pode zerar o progresso de todo mundo, com aviso no menu (usado na versão dos chefões novos)
 - [x] Botão "Recomeçar do zero" no fim do menu, que pergunta antes de apagar fases, estrelas, moedas e melhorias (o som fica como está). Só aparece quando há algo para apagar
-- [x] Devolver as melhorias na loja: desfaz todas as compras e devolve 100% do que foi gasto, para comprar de novo; 2 vezes na campanha, com confirmação e o número de devoluções que restam
+- [x] Devolver as melhorias na loja: desfaz as compras de Dano, Reforços e Resistência e devolve 100% do que foi gasto nelas, para comprar de novo; 2 vezes na campanha, com confirmação e o número de devoluções que restam. O Butim fica fora
 - [x] Publicado em https://squad-x-web-inky.vercel.app (a cada push no `master`), com o endereço no README, no `CLAUDE.md` e no "About" do GitHub, junto com a descrição e os tópicos do repositório
 
 **Documentação e licença**

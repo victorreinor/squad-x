@@ -46,7 +46,7 @@ Tudo é original: cada soldado, monstro, arma e som sai de código. Nenhum model
 - **Hordas:** zumbis, velocistas, brutamontes, policiais de choque (o tiro de soldado rende menos neles), homens-bomba (explodem em cadeia) e atiradores (recuam e atiram).
 - **Chefões:** cinco, um por mundo, e cada um luta de um jeito: mísseis, barris explosivos rolando, escudo com laser, gelo com pancada e chuva de meteoros. Ficam parados na pista, visíveis de longe, e a barra de vida no topo mostra quanto falta.
 - **Perigos:** espinhos para desviar, minas para atirar de longe e, a partir da fase 6, um **bombardeiro** que deixa um corredor seguro entre as zonas vermelhas.
-- **Loja:** Dano, Reforços, Resistência e Butim. A campanha inteira é calibrada em volta dela (veja [Dificuldade](#-dificuldade-amarrada-à-loja)). Duas vezes na campanha dá para devolver todas as melhorias, receber de volta tudo o que foi gasto e comprar de novo.
+- **Loja:** Dano, Reforços, Resistência e Butim. A campanha inteira é calibrada em volta dela (veja [Dificuldade](#-dificuldade-amarrada-à-loja)). Duas vezes na campanha dá para devolver Dano, Reforços e Resistência, receber de volta tudo o que foi gasto neles e comprar de novo (o Butim fica).
 
 ## 👥 O elenco
 
