@@ -233,9 +233,10 @@ describe("balance, tied to the shop", () => {
     expect(wins(withoutShop, later)).toBeLessThanOrEqual(Math.floor(later.length * 0.15));
   }, slow);
 
-  test("with what the shop would have given them, a good player beats most levels, and it costs them soldiers", () => {
+  test("with what the shop would have given them, a good player beats about half the levels at the first try, and it costs them soldiers", () => {
+    // each level is tuned for this player to win half of their tries: the campaign asks for persistence
     const won = first30.map((n) => withShop(n)).filter((s) => s.status === "won");
-    expect(won.length).toBeGreaterThanOrEqual(21);
+    expect(won.length).toBeGreaterThanOrEqual(13);
     expect(won.filter((s) => s.losses > 0).length / won.length).toBeGreaterThanOrEqual(0.8);
   }, slow);
 
@@ -252,8 +253,9 @@ describe("balance, tied to the shop", () => {
   }, slow);
 
   test("bosses are beatable with the shop, and not without it", () => {
+    // half the tries for a boss halfway through a world, a third for the one that closes it
     const bosses = [5, 10, 15, 20, 25, 30];
-    expect(wins(withShop, bosses)).toBeGreaterThanOrEqual(4);
+    expect(wins(withShop, bosses)).toBeGreaterThanOrEqual(2);
     expect(wins(withoutShop, bosses)).toBe(0);
   }, slow);
 

@@ -6,3 +6,4 @@ export * from "./rng";
 export * from "./types";
 export * from "./upgrades";
 export * from "./calibrate";
+export * from "./campaign";

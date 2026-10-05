@@ -1,4 +1,4 @@
-import type { EnemyKind } from "./types";
+import type { BossKind, EnemyKind, Projectile } from "./types";
 
 /** simulation ticks per second */
 export const TICK_RATE = 30;
@@ -72,17 +72,96 @@ export const SHOOTER_FIRE_INTERVAL = 38;
 
 /** the squad halts this far in front of the boss and fights it standing (units) */
 export const BOSS_STANDOFF = 14;
-/** the boss starts attacking once the squad is this close (units) */
-export const BOSS_ACTIVE_RANGE = 34;
-/** ticks between two slams, the warning the player gets on the road before a slam lands, and its half-width (units) */
-export const BOSS_SLAM_INTERVAL = 140;
+/** the boss wakes up and starts attacking once the squad is this close: as soon as its shots can reach the boss (units) */
+export const BOSS_ACTIVE_RANGE = FIRE_RANGE;
+/**
+ * how long a boss fight lasts for the squad a good player brings to it: the boss of a world's 5th level and of its
+ * 10th (seconds of that squad's fire). The minions and the attacks make the real fight longer.
+ */
+export const BOSS_FIGHT_SECONDS = 12;
+export const BOSS_FINAL_FIGHT_SECONDS = 18;
+/**
+ * how far the calibration's pressure may stretch or shrink a boss's hit points: within these bounds, so a fight can be
+ * tuned when the boss alone is too much or too little, and never falls in a moment or drags on
+ */
+export const BOSS_PRESSURE_RANGE = [0.7, 1.15] as const;
+/** the share of those hit points each boss gets: the Mecha's shield already stops most of the fire, so it needs fewer */
+export const BOSS_TOUGHNESS: Record<BossKind, number> = { general: 1, warlord: 1, mech: 0.65, yeti: 1, demon: 1 };
+/** ticks between two attacks of each boss */
+export const BOSS_ATTACK_INTERVAL: Record<BossKind, number> = { general: 120, warlord: 150, mech: 150, yeti: 180, demon: 170 };
+/** below this share of its hit points a boss is enraged, and from then on waits only this share of the time between attacks */
+export const BOSS_FURY_AT = 0.5;
+export const BOSS_FURY_PACE = 0.65;
+/** the minions each boss calls: the enemy its world is known for */
+export const BOSS_MINIONS: Record<BossKind, EnemyKind> = { general: "runner", warlord: "sprinter", mech: "shield", yeti: "brute", demon: "bomber" };
+/** ticks between two groups of minions */
+export const BOSS_SUMMON_INTERVAL = 270;
+/** the hit points of the first group, in seconds of the fire of the squad a good player brings (s) */
+export const BOSS_MINION_SECONDS = 0.8;
+/** each group comes this many times bigger than the one before: a fight that drags on is a fight lost */
+export const BOSS_SUMMON_GROWTH = 1.3;
+/** the most minions in one group; past it they come tougher instead of more */
+export const BOSS_MAX_MINIONS = 40;
+
+/** the Yeti's slam: the warning the player gets on the road, its half-width (units) and the share of the soldiers in the strip it takes */
 export const BOSS_SLAM_WARN = 34;
 export const BOSS_SLAM_HALF_WIDTH = 1.0;
-/** the share of the soldiers standing in the strip that a slam takes */
-export const BOSS_SLAM_KILL_SHARE = 0.6;
-/** ticks between two groups of minions the boss calls, and how many come */
-export const BOSS_SUMMON_INTERVAL = 270;
-export const BOSS_SUMMON_COUNT = 7;
+export const BOSS_SLAM_KILL_SHARE = 0.3;
+
+/**
+ * what the bosses send down the road, per kind (the General's missile, the Warlord's explosive keg): speed (units/s),
+ * body radius for the columns that shoot it (units), half-width of its blast (units), the share of the soldiers in the
+ * blast it kills, and its hit points in seconds of the fire of `PROJECTILE_COLUMNS` of the squad's columns, as the squad
+ * is when it is launched (s): the same challenge for 40 soldiers or 400, and more damage from the shop shoots it down sooner
+ */
+export const PROJECTILE_STATS: Record<Projectile["kind"], { speed: number; radius: number; blast: number; share: number; hpSeconds: number }> = {
+  missile: { speed: 9, radius: 0.5, blast: 1.2, share: 0.5, hpSeconds: 0.9 },
+  keg: { speed: 4.5, radius: 0.7, blast: 1, share: 0.6, hpSeconds: 1.7 },
+};
+/** how many of the squad's columns a missile or a keg is sized against: about as many as stand under one */
+export const PROJECTILE_COLUMNS = 3;
+/** how far in front of the boss its missiles and kegs set off (units) */
+export const BOSS_LAUNCH_AHEAD = 2.5;
+/** the General's salvo: how far apart his missiles leave his shoulders, and how far apart the three of an enraged one land (units) */
+export const MISSILE_TUBES = 1.4;
+export const MISSILE_SPREAD = 2.6;
+/** the lanes the Warlord's kegs roll down, one left open each time (x, units) */
+export const KEG_LANES = [-3, -1, 1, 3];
+
+/**
+ * the Mecha's shield: where its opening can be (x, units) and its half-width (units), ticks before the opening moves,
+ * and how far in front of the Mecha the shield stands (units). Its laser fires down the opening: warning (ticks) and the
+ * share of the soldiers in the strip it kills
+ */
+export const MECH_GAPS = [-2.6, 0, 2.6];
+export const MECH_GAP_HALF_WIDTH = 1.7;
+export const MECH_GAP_TICKS = 150;
+export const MECH_SHIELD_AHEAD = 2.8;
+export const LASER_WARN = 30;
+export const LASER_KILL_SHARE = 0.25;
+
+/**
+ * the Yeti's ice: warning (ticks) and half-width of the strip (units); the soldiers caught stop shooting and the squad
+ * slides at this share of its speed for some ticks; the slam comes this many ticks after the ice lands
+ */
+export const ICE_WARN = 30;
+export const ICE_HALF_WIDTH = 1.2;
+export const CHILL_TICKS = 60;
+export const CHILL_SLOW = 0.4;
+export const YETI_COMBO_GAP = 4;
+
+/**
+ * the Demon's meteors: the spots they can fall on (x, units), one always left clear, how many fall at once (two, three
+ * when enraged), warning (ticks), half-width (units) and share of the soldiers they kill. Each leaves the road burning
+ * for some ticks, taking this share of the soldiers standing in the fire every few ticks
+ */
+export const METEOR_SPOTS = [-3, -1, 1, 3];
+export const METEOR_WARN = 42;
+export const METEOR_HALF_WIDTH = 0.7;
+export const METEOR_KILL_SHARE = 0.25;
+export const FIRE_TICKS = 90;
+export const FIRE_INTERVAL = 15;
+export const FIRE_BURN_SHARE = 0.025;
 /** how far apart enemies of one wave stand, front to back (units) */
 export const WAVE_ROW_SPACING = 1.1;
 /** half-width of a barrel (units) */

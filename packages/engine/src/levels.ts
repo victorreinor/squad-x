@@ -1,7 +1,9 @@
-import { ENEMY_STATS, LANE_HALF_WIDTH, MAX_SQUAD, VEHICLE_STATS, WEAPON_DPS } from "./constants";
+import { BOSS_FIGHT_SECONDS, BOSS_FINAL_FIGHT_SECONDS, BOSS_MINION_SECONDS, BOSS_ACTIVE_RANGE, BOSS_MINIONS, BOSS_PRESSURE_RANGE, BOSS_TOUGHNESS, ENEMY_STATS, LANE_HALF_WIDTH, MAX_SQUAD, VEHICLE_STATS, WEAPON_DPS } from "./constants";
 import { nextRandom } from "./rng";
 import {
+  BOSS_KINDS,
   VEHICLE_KINDS,
+  type BossKind,
   WEAPON_KINDS,
   type EnemyKind,
   type LevelDef,
@@ -28,6 +30,8 @@ export interface LevelSpec {
   startSquad: number;
   startWeapon: WeaponKind;
   boss: boolean;
+  /** how long the boss fight lasts for the squad a good player brings (seconds of its fire); read only when there is a boss */
+  bossSeconds: number;
   /** how many air strikes the level has: the world starts attacking on its own */
   strikes: number;
   /** how hard the hordes and the boss hit, as a multiple of the usual; `calibratePressure` picks it by playing the level */
@@ -100,6 +104,8 @@ export function campaignSpec(n: number): LevelSpec {
     startSquad: START_SQUAD[mode],
     startWeapon: "pistol",
     boss: inWorld === LEVELS_PER_WORLD - 1 || inWorld === 4,
+    // the boss that closes a world takes longer to bring down than the one halfway through it
+    bossSeconds: inWorld === LEVELS_PER_WORLD - 1 ? BOSS_FINAL_FIGHT_SECONDS : BOSS_FIGHT_SECONDS,
     // the first bombers show up at level 6; later levels send more of them
     strikes: n < STRIKE_FROM_LEVEL ? 0 : n < STRIKE_FROM_LEVEL + 10 ? 1 : 2,
   };
@@ -379,15 +385,49 @@ export function generateLevel(spec: LevelSpec): LevelDef {
   // from level 6 the world attacks on its own: bombers fly over at set points of the run
   for (let k = 0; k < spec.strikes; k++) level.events.push({ at: Math.round(z * (spec.strikes === 1 ? 0.55 : 0.35 + k * 0.35)), kind: "airstrike", bombs: 2 + Math.min(2, spec.world) });
 
-  // not every barrel gets shot open, so count on halfway between the starting weapon and the best one on the road
-  const dps = (WEAPON_DPS[spec.startWeapon] + WEAPON_DPS[bestWeapon]) / 2;
   if (spec.boss) {
-    level.boss = { z: Math.round(z + 12), hp: Math.round(Math.min(power, 250) * dps * (6 + d * 1.0) * (spec.pressure ?? 1)) };
-    level.length = level.boss.z + 28;
+    const at = Math.round(z + 12);
+    const kind = BOSS_KINDS[spec.world % BOSS_KINDS.length];
+    // the fight is measured in seconds of the fire of the squad a good player brings, so no boss falls in a moment or
+    // drags on for minutes; the hordes before it and its minions are what the pressure turns up. The squad is taken as
+    // it is when the boss wakes up, before its first attack
+    const fire = Math.max(1, fireAt(at - BOSS_ACTIVE_RANGE));
+    const minion = ENEMY_STATS[BOSS_MINIONS[kind]];
+    const minions = Math.max(3, Math.round((fire * BOSS_MINION_SECONDS * (spec.pressure ?? 1)) / (minion.hp / minion.armor)));
+    const [least, most] = BOSS_PRESSURE_RANGE;
+    const stretch = Math.max(least, Math.min(most, spec.pressure ?? 1));
+    level.boss = { kind, z: at, hp: Math.round(fire * spec.bossSeconds * BOSS_TOUGHNESS[kind] * stretch), minions };
+    level.length = at + 28;
   } else {
     level.length = Math.round(z + 18);
   }
   return level;
+}
+
+/**
+ * A short road straight to one boss, for watching its attack up close (`?chefao=` in the client): a middling squad with
+ * a submachine gun, the boss a moment away and lasting about as long as the hardest boss of its world.
+ */
+export function bossArena(kind: BossKind): LevelDef {
+  const world = BOSS_KINDS.indexOf(kind);
+  const squad = 40;
+  const fire = squad * WEAPON_DPS.smg;
+  const z = 40;
+  return {
+    mode: "mixed",
+    twist: "none",
+    world,
+    length: z + 20,
+    startSquad: squad,
+    startWeapon: "smg",
+    gates: [],
+    traps: [],
+    events: [],
+    barrels: [],
+    waves: [],
+    boss: { kind, z, hp: Math.round(fire * BOSS_FINAL_FIGHT_SECONDS * BOSS_TOUGHNESS[kind]), minions: 4 },
+    theme: THEMES[world % THEMES.length],
+  };
 }
 
 function pickReward(rng: { rng: number }, difficulty: number, loot: boolean, scarce: boolean, power: number): Reward {

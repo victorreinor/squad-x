@@ -8,6 +8,8 @@ import {
   buyUpgrade,
   createGame,
   expectedUpgrades,
+  REPLAY_SHARES,
+  STAR_COINS,
   levelReward,
   lossMultiplier,
   runPayout,
@@ -66,10 +68,23 @@ describe("upgrades", () => {
     expect(buyUpgrade({ ...NO_UPGRADES, squad: UPGRADE_MAX_LEVEL }, 1e9, "squad")).toBeNull();
   });
 
-  test("a level pays its reward, its stars and what was picked up, all raised by the coin upgrade", () => {
-    expect(runPayout(20, 3, NO_UPGRADES, 1)).toBe(20 + 3 * 15 + levelReward(1));
-    expect(runPayout(20, 3, { ...NO_UPGRADES, coins: 5 }, 1)).toBe(Math.round((20 + 45 + levelReward(1)) * 1.5));
+  test("a first win pays the level's reward, its stars and what was picked up, all raised by the coin upgrade", () => {
+    expect(runPayout(20, 3, NO_UPGRADES, 1)).toBe(20 + levelReward(1) + 3 * STAR_COINS);
+    expect(runPayout(20, 3, { ...NO_UPGRADES, coins: 5 }, 1)).toBe(Math.round((20 + levelReward(1) + 3 * STAR_COINS) * 1.5));
     expect(levelReward(10)).toBeGreaterThan(levelReward(1));
+  });
+
+  test("a lost run pays nothing, however far it got", () => {
+    expect(runPayout(30, 0, NO_UPGRADES, 20)).toBe(0);
+  });
+
+  test("winning a level again pays less every time, then nothing, but a better score always pays its new stars", () => {
+    const reward = 20 + levelReward(5);
+    expect(runPayout(20, 2, NO_UPGRADES, 5, 1, 2)).toBe(Math.round(reward * REPLAY_SHARES[1]));
+    expect(runPayout(20, 2, NO_UPGRADES, 5, 2, 2)).toBe(Math.round(reward * REPLAY_SHARES[2]));
+    expect(runPayout(20, 2, NO_UPGRADES, 5, 3, 2)).toBe(0);
+    expect(runPayout(20, 3, NO_UPGRADES, 5, 3, 1)).toBe(2 * STAR_COINS);
+    expect(REPLAY_SHARES[1]).toBeLessThan(REPLAY_SHARES[0]);
   });
 });
 

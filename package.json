@@ -13,6 +13,7 @@
     "test": "bun test packages",
     "typecheck": "tsc -p packages/engine --noEmit && tsc -p apps/web --noEmit",
     "calibrate": "bun tools/calibrate.ts",
+    "stress": "bun tools/stress.ts",
     "icons": "bun tools/make-icons.ts"
   },
   "devDependencies": {

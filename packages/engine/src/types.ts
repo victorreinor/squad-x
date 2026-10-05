@@ -6,6 +6,14 @@ export type WeaponKind = (typeof WEAPON_KINDS)[number];
 export const ENEMY_KINDS = ["runner", "sprinter", "brute", "shield", "bomber", "shooter", "boss"] as const;
 export type EnemyKind = (typeof ENEMY_KINDS)[number];
 
+/**
+ * The boss of each world, in the order the worlds appear, each with its own attack. The General fires missiles, the
+ * Warlord rolls explosive kegs, the Mecha hides behind a shield and lasers its opening, the Yeti freezes the road and
+ * then slams it, and the Demon rains meteors that leave the road burning.
+ */
+export const BOSS_KINDS = ["general", "warlord", "mech", "yeti", "demon"] as const;
+export type BossKind = (typeof BOSS_KINDS)[number];
+
 /** vehicles that run beside the squad, weakest to strongest */
 export const VEHICLE_KINDS = ["moto", "heli", "tank"] as const;
 export type VehicleKind = (typeof VEHICLE_KINDS)[number];
@@ -79,21 +87,72 @@ export interface Enemy {
   z: number;
   hp: number;
   maxHp: number;
-  /** ticks until a shooter fires or a boss slams again */
+  /** ticks until a shooter fires again */
   cooldown: number;
-  /** ticks until a boss calls its next minions */
-  summon: number;
 }
 
-/** A strip of road something is about to smash: soldiers in it are lost when `ticks` runs out. The boss slams, a bomber drops bombs. */
+/**
+ * A strip of road something is about to hit: when `ticks` runs out, a share of the soldiers in it is lost (or, for
+ * ice, frozen). A bomber drops bombs; bosses slam, laser, freeze and call meteors.
+ */
 export interface Hazard {
   id: number;
-  kind: "slam" | "bomb";
+  kind: "slam" | "bomb" | "laser" | "ice" | "meteor";
+  /** who marked it: the boss's marks are part of its fight, the bomber's are not */
+  from: "boss" | "plane";
   x: number;
   halfWidth: number;
   ticks: number;
-  /** the share of the soldiers in the strip that it kills */
+  /** the ticks of warning it started with */
+  warn: number;
+  /** the share of the soldiers in the strip that it kills (for ice: that it freezes) */
   share: number;
+}
+
+/** What a boss sends down the road at the squad: a missile (the General) or an explosive keg (the Warlord). Both can be shot down. */
+export interface Projectile {
+  id: number;
+  kind: "missile" | "keg";
+  x: number;
+  z: number;
+  /** where across the road it lands: a missile homes in on where the squad stood when it was fired, a keg rolls straight */
+  targetX: number;
+  hp: number;
+}
+
+/** A strip of road on fire where a meteor landed: it burns the soldiers standing in it until it goes out. */
+export interface Fire {
+  id: number;
+  x: number;
+  halfWidth: number;
+  ticks: number;
+}
+
+/** A boss's side of the fight; its body, with its hit points, is in `enemies`. */
+export interface BossFight {
+  kind: BossKind;
+  /** the squad came close enough: the boss attacks and calls minions from now on */
+  awake: boolean;
+  /** below a share of its hit points the boss is enraged and attacks faster */
+  enraged: boolean;
+  /** ticks until its next attack */
+  cooldown: number;
+  /** the Yeti's next blow: the ice first, the slam right after it */
+  next: "ice" | "slam";
+  /** ticks until its next minions, and how many come then (each call brings more) */
+  summon: number;
+  minions: number;
+  /** the opening in the Mecha's shield (x), or null for a boss without a shield, and ticks until it moves */
+  gap: number | null;
+  gapTicks: number;
+}
+
+/** A boss attack that landed this tick: where, and how many soldiers it took (for ice: how many it froze). */
+export interface BossHit {
+  kind: "slam" | "missile" | "keg" | "laser" | "ice" | "meteor" | "fire";
+  x: number;
+  z: number;
+  lost: number;
 }
 
 /** A thing on the road to avoid: spikes to steer around, a mine to shoot or steer around. */
@@ -147,8 +206,11 @@ export interface LevelDef {
   events: EventDef[];
   barrels: Omit<Barrel, "id" | "maxHp">[];
   waves: WaveDef[];
-  /** the boss stands at `z` on the road with this many hit points; the squad can't pass until it is dead. Null = no boss. */
-  boss: { z: number; hp: number } | null;
+  /**
+   * The boss stands at `z` on the road with this many hit points; the squad can't pass until it is dead. `minions` is
+   * how many come in its first group. Null = no boss.
+   */
+  boss: { kind: BossKind; z: number; hp: number; minions: number } | null;
   /** palette for the scenery */
   theme: string;
 }
@@ -199,14 +261,22 @@ export interface GameState {
   volleys: Volley[];
   /** where enemy shooters fired this tick, for drawing */
   enemyShots: { x: number; z: number }[];
-  /** strips of road the boss has marked and is about to smash */
+  /** strips of road a boss or a bomber has marked and is about to hit */
   hazards: Hazard[];
-  /** the last slam that landed: where, when and how many soldiers it took */
-  lastSlam: { x: number; tick: number; lost: number } | null;
+  /** the boss's side of the fight while it lives, or null */
+  bossFight: BossFight | null;
+  /** missiles and kegs on their way to the squad */
+  projectiles: Projectile[];
+  /** strips of road on fire */
+  fires: Fire[];
+  /** the Yeti's ice: for `ticks` more, this share of the squad is frozen (it does not shoot) and the squad slides slower */
+  chill: { ticks: number; share: number } | null;
+  /** boss attacks that landed this tick */
+  bossHits: BossHit[];
   /** the last trap or bomb that landed */
   lastImpact: { kind: "spikes" | "mine" | "bomb"; x: number; z: number; tick: number; lost: number } | null;
-  /** traps shot to pieces this tick, for drawing */
-  popped: { x: number; z: number }[];
+  /** mines, missiles and kegs shot to pieces this tick, for drawing */
+  popped: { kind: "mine" | "missile" | "keg"; x: number; z: number }[];
   /** an air strike under way: the plane's progress across the sky, 0 to 1, or null */
   plane: { t: number; bombs: number } | null;
 }

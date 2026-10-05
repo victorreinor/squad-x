@@ -38,11 +38,25 @@ export const lossMultiplier = (u: Upgrades) => 1 - ARMOR_PER_LEVEL * u.armor;
 /** Coins for finishing level `n` before stars and loot: later levels pay more. */
 export const levelReward = (n: number) => 30 + 6 * n;
 
-/** Coins for each star earned. */
-export const STAR_COINS = 15;
+/** Coins for each star better than the level's best so far. */
+export const STAR_COINS = 25;
 
-/** What a finished run pays: what was picked up, the stars, the level's reward, all raised by the coin upgrade. */
-export const runPayout = (coins: number, stars: number, u: Upgrades, level = 1) => Math.round((coins + stars * STAR_COINS + levelReward(level)) * (1 + COINS_PER_LEVEL * u.coins));
+/**
+ * The share of a level's reward and loot a win pays, by how many times the level was won before: in full the first
+ * time, then half, then a quarter, then nothing. Winning the same level over and over is not a way to fill the wallet.
+ */
+export const REPLAY_SHARES = [1, 0.5, 0.25];
+
+/**
+ * What a run pays. A lost run pays nothing. A win pays the level's reward and what was picked up, by `REPLAY_SHARES`
+ * after `wins` earlier wins of the level, and `STAR_COINS` for each star above the level's `best`, every time. All of
+ * it is raised by the coin upgrade.
+ */
+export function runPayout(coins: number, stars: number, u: Upgrades, level = 1, wins = 0, best = 0): number {
+  if (stars === 0) return 0;
+  const share = REPLAY_SHARES[wins] ?? 0;
+  return Math.round(((coins + levelReward(level)) * share + Math.max(0, stars - best) * STAR_COINS) * (1 + COINS_PER_LEVEL * u.coins));
+}
 
 /** `owned` after buying one level of `kind` with `wallet` coins, or null when it can't be bought. */
 export function buyUpgrade(owned: Upgrades, wallet: number, kind: UpgradeKind): { upgrades: Upgrades; wallet: number } | null {
@@ -53,35 +67,58 @@ export function buyUpgrade(owned: Upgrades, wallet: number, kind: UpgradeKind): 
   return { upgrades: { ...owned, [kind]: level + 1 }, wallet: wallet - cost };
 }
 
+/** The first level that cannot be beaten without visiting the shop. */
+export const SHOP_FROM_LEVEL = 3;
+
 /** How a typical player plays the economy: two stars a level and about this many coins out of the barrels. */
 const TYPICAL_STARS = 2;
 const TYPICAL_LOOT = 14;
+/**
+ * From `SHOP_FROM_LEVEL` on, a typical player stuck on a level goes back and wins the levels before it again, for
+ * what they still pay: this many earlier levels, each one more time. Lost runs pay nothing.
+ */
+const TYPICAL_REPLAYS = 1;
 /** The order a typical player buys in: the cheapest of the three that matter, damage first. The coin upgrade is skipped. */
 const BUY_ORDER: UpgradeKind[] = ["damage", "squad", "armor"];
 
 const expectedCache = new Map<number, Upgrades>();
 
 /**
- * What the shop has given a player who has cleared levels 1 to n-1 with two stars each and spent everything as soon as
- * they could, on damage, reinforcements and armour in turn. The campaign is tuned for this player: a level is as hard
- * as it can be while *they* still beat it, so skipping the shop means getting stuck.
+ * What the shop has given a player who has cleared levels 1 to n-1 with two stars each, gone back for
+ * `TYPICAL_REPLAYS` earlier levels before each new one from `SHOP_FROM_LEVEL` on, and spent everything as soon as they
+ * could, on damage, reinforcements and armour in turn. The campaign is tuned for this player: a level is as hard as it
+ * can be while *they* still beat it, so skipping the shop means getting stuck.
  */
 export function expectedUpgrades(n: number): Upgrades {
   const known = expectedCache.get(n);
   if (known) return known;
   let owned: Upgrades = { ...NO_UPGRADES };
   let wallet = 0;
+  const wins: number[] = [];
   for (let level = 1; level < n; level++) {
-    wallet += runPayout(TYPICAL_LOOT, TYPICAL_STARS, owned, level);
-    for (;;) {
-      // the kind with the fewest levels (ties go in BUY_ORDER) is the one they buy next
-      const kind = [...BUY_ORDER].sort((a, b) => owned[a] - owned[b] || BUY_ORDER.indexOf(a) - BUY_ORDER.indexOf(b))[0];
-      const bought = buyUpgrade(owned, wallet, kind);
-      if (!bought) break;
-      owned = bought.upgrades;
-      wallet = bought.wallet;
+    // stuck on this level, they win the ones before it again, the most recent first, while those still pay
+    if (level >= SHOP_FROM_LEVEL) {
+      for (let back = 1; back <= TYPICAL_REPLAYS && level - back >= 1; back++) {
+        const earlier = level - back;
+        wallet += runPayout(TYPICAL_LOOT, TYPICAL_STARS, owned, earlier, wins[earlier], TYPICAL_STARS);
+        wins[earlier]++;
+      }
     }
+    wallet += runPayout(TYPICAL_LOOT, TYPICAL_STARS, owned, level);
+    wins[level] = 1;
+    ({ upgrades: owned, wallet } = spendLikeATypicalPlayer(owned, wallet));
   }
   expectedCache.set(n, owned);
   return owned;
+}
+
+/** What a typical player does in the shop: buys as much as the wallet allows, always the kind they have least of (ties in `BUY_ORDER`). */
+export function spendLikeATypicalPlayer(owned: Upgrades, wallet: number): { upgrades: Upgrades; wallet: number } {
+  for (;;) {
+    const kind = [...BUY_ORDER].sort((a, b) => owned[a] - owned[b] || BUY_ORDER.indexOf(a) - BUY_ORDER.indexOf(b))[0];
+    const bought = buyUpgrade(owned, wallet, kind);
+    if (!bought) return { upgrades: owned, wallet };
+    owned = bought.upgrades;
+    wallet = bought.wallet;
+  }
 }

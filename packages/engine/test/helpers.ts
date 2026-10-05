@@ -16,3 +16,12 @@ export function play(level: LevelDef, seed: number, player: (s: GameState) => In
   for (let i = 0; i < 30 * 900 && state.status === "playing"; i++) step(state, player(state));
   return state;
 }
+
+/** Step until `until` holds (or `ticks` pass), with the input `player` picks each tick. Returns whether it held. */
+export function runUntil(state: GameState, ticks: number, until: (s: GameState) => boolean, player: (s: GameState) => Input = () => IDLE): boolean {
+  for (let i = 0; i < ticks && state.status === "playing"; i++) {
+    step(state, player(state));
+    if (until(state)) return true;
+  }
+  return false;
+}

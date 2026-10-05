@@ -4,13 +4,41 @@ import {
   BOMBER_SPLASH_DAMAGE,
   BOMBER_SPLASH_RADIUS,
   BOSS_ACTIVE_RANGE,
+  BOSS_ATTACK_INTERVAL,
+  BOSS_FURY_AT,
+  BOSS_FURY_PACE,
+  BOSS_LAUNCH_AHEAD,
+  BOSS_MAX_MINIONS,
+  BOSS_MINIONS,
   BOSS_SLAM_HALF_WIDTH,
-  BOSS_SLAM_INTERVAL,
   BOSS_SLAM_KILL_SHARE,
   BOSS_SLAM_WARN,
   BOSS_STANDOFF,
-  BOSS_SUMMON_COUNT,
+  BOSS_SUMMON_GROWTH,
   BOSS_SUMMON_INTERVAL,
+  CHILL_SLOW,
+  CHILL_TICKS,
+  FIRE_BURN_SHARE,
+  FIRE_INTERVAL,
+  FIRE_TICKS,
+  ICE_HALF_WIDTH,
+  ICE_WARN,
+  KEG_LANES,
+  LASER_KILL_SHARE,
+  LASER_WARN,
+  MECH_GAP_HALF_WIDTH,
+  MECH_GAP_TICKS,
+  MECH_GAPS,
+  MECH_SHIELD_AHEAD,
+  METEOR_HALF_WIDTH,
+  METEOR_KILL_SHARE,
+  METEOR_SPOTS,
+  METEOR_WARN,
+  MISSILE_SPREAD,
+  MISSILE_TUBES,
+  PROJECTILE_COLUMNS,
+  PROJECTILE_STATS,
+  YETI_COMBO_GAP,
   COLUMN_HALF_WIDTH,
   COLUMN_SPACING,
   CONTACT_DISTANCE,
@@ -49,9 +77,9 @@ import {
   WAVE_ROW_SPACING,
   WEAPON_DPS,
 } from "./constants";
-import { nextRandom } from "./rng";
+import { nextRandom, pickRandom } from "./rng";
 import { NO_UPGRADES, bonusSoldiers, damageMultiplier, lossMultiplier, type Upgrades } from "./upgrades";
-import { WEAPON_KINDS, type Enemy, type EnemyKind, type GameState, type Hazard, type Input, type LevelDef, type Reward, type WaveDef } from "./types";
+import { WEAPON_KINDS, type BossFight, type Enemy, type EnemyKind, type GameState, type Hazard, type Input, type LevelDef, type Projectile, type Reward, type WaveDef } from "./types";
 
 /** How many firing columns a squad of this size spreads into. */
 export const squadColumns = (count: number) => Math.max(1, Math.min(MAX_COLUMNS, Math.ceil(Math.sqrt(count))));
@@ -110,7 +138,11 @@ export function createGame(level: LevelDef, seed: number, upgrades: Upgrades = N
     volleys: [],
     enemyShots: [],
     hazards: [],
-    lastSlam: null,
+    bossFight: null,
+    projectiles: [],
+    fires: [],
+    chill: null,
+    bossHits: [],
     lastImpact: null,
     popped: [],
     plane: null,
@@ -119,7 +151,21 @@ export function createGame(level: LevelDef, seed: number, upgrades: Upgrades = N
   for (const b of level.barrels) state.barrels.push({ ...b, id: state.nextId++, maxHp: b.hp });
   for (const t of level.traps) state.traps.push({ ...t, id: state.nextId++, hp: t.kind === "mine" ? MINE_HP : 0, used: false });
   // the boss is on the road from the start, so the player sees it waiting far ahead
-  if (level.boss) spawnGroup(state, "boss", 1, 0, 0, level.boss.z, level.boss.hp);
+  if (level.boss) {
+    const { kind, z, hp, minions } = level.boss;
+    spawnGroup(state, "boss", 1, 0, 0, z, hp);
+    state.bossFight = {
+      kind,
+      awake: false,
+      enraged: false,
+      cooldown: 0,
+      next: "ice",
+      summon: BOSS_SUMMON_INTERVAL / 2,
+      minions,
+      gap: kind === "mech" ? pickRandom(state, MECH_GAPS) : null,
+      gapTicks: MECH_GAP_TICKS,
+    };
+  }
   return state;
 }
 
@@ -143,7 +189,6 @@ function spawnGroup(state: GameState, kind: EnemyKind, count: number, centre: nu
       hp: maxHp,
       maxHp,
       cooldown: kind === "shooter" ? SHOOTER_FIRE_INTERVAL : 0,
-      summon: kind === "boss" ? BOSS_SUMMON_INTERVAL / 2 : 0,
     });
   }
 }
@@ -177,8 +222,8 @@ function loseSoldiers(state: GameState, n: number) {
   return lost;
 }
 
-/** How many soldiers stand in the columns that a strip `x ± half` touches. */
-function soldiersInStrip(state: GameState, x: number, half: number): number {
+/** How many soldiers stand in the columns that a strip `x ± half` touches: what a blow on that strip can hit. */
+export function soldiersInStrip(state: GameState, x: number, half: number): number {
   let total = 0;
   columnXs(state.squad.x, state.squad.count).forEach((cx, i) => {
     if (Math.abs(cx - x) <= half + COLUMN_HALF_WIDTH) total += soldiersInColumn(state.squad.count, i);
@@ -200,10 +245,18 @@ function firstTarget(state: GameState, x: number, half = COLUMN_HALF_WIDTH): Tar
   const nearest = (things: Target[]) => things.reduce<Target | null>((best, t) => (!best || t.z < best.z ? t : best), null);
 
   const blockers: Target[] = [];
+  const gap = state.bossFight?.gap ?? null;
   for (const e of state.enemies) {
     const stats = ENEMY_STATS[e.kind];
     if (e.hp <= 0 || !ahead(e.z) || Math.abs(e.x - x) > half + stats.radius) continue;
-    blockers.push({ z: e.z, apply: (damage, pierce) => void (e.hp -= pierce ? damage : damage * stats.armor) });
+    // the Mecha's shield takes every shot that does not come through its opening
+    if (e.kind === "boss" && gap !== null && Math.abs(x - gap) > MECH_GAP_HALF_WIDTH) blockers.push({ z: e.z - MECH_SHIELD_AHEAD, apply: () => {} });
+    else blockers.push({ z: e.z, apply: (damage, pierce) => void (e.hp -= pierce ? damage : damage * stats.armor) });
+  }
+  // a missile or a keg on its way is in front of the boss: it takes the fire of the columns under it
+  for (const p of state.projectiles) {
+    if (p.hp <= 0 || !ahead(p.z) || Math.abs(p.x - x) > half + PROJECTILE_STATS[p.kind].radius) continue;
+    blockers.push({ z: p.z, apply: (damage) => void (p.hp -= damage) });
   }
   for (const b of state.barrels) {
     if (b.hp <= 0 || !ahead(b.z) || Math.abs(b.x - x) > half + BARREL_RADIUS) continue;
@@ -267,8 +320,8 @@ function removeDead(state: GameState) {
   }
 }
 
-/** The boss, if it is still on the road. */
-const bossOf = (state: GameState) => state.enemies.find((e) => e.kind === "boss");
+/** The boss's body, if it is still on the road. */
+export const bossOf = (state: GameState) => state.enemies.find((e) => e.kind === "boss");
 
 /** Let one enemy act: walk, shoot, slam or blow up. Returns false when it is gone. */
 function actEnemy(state: GameState, e: Enemy): boolean {
@@ -277,17 +330,9 @@ function actEnemy(state: GameState, e: Enemy): boolean {
   const gap = e.z - state.distance;
 
   if (e.kind === "boss") {
-    if (gap > BOSS_ACTIVE_RANGE) return true;
-    if (e.cooldown > 0) e.cooldown--;
-    else if (!state.hazards.some((h) => h.kind === "slam")) {
-      // the strip is marked where the squad stands now; it has the warning time to get out of it
-      state.hazards.push({ id: state.nextId++, kind: "slam", x: squad.x, halfWidth: BOSS_SLAM_HALF_WIDTH, ticks: BOSS_SLAM_WARN, share: BOSS_SLAM_KILL_SHARE });
-      e.cooldown = BOSS_SLAM_INTERVAL;
-    }
-    if (e.summon > 0) e.summon--;
-    else {
-      spawnGroup(state, "runner", BOSS_SUMMON_COUNT, 0, 5, e.z - 3);
-      e.summon = BOSS_SUMMON_INTERVAL;
+    if (gap <= BOSS_ACTIVE_RANGE && state.bossFight) {
+      state.bossFight.awake = true;
+      actBoss(state, e, state.bossFight);
     }
     return true;
   }
@@ -323,15 +368,142 @@ function actEnemy(state: GameState, e: Enemy): boolean {
   return e.z > state.distance - 2;
 }
 
-/** Count down the marked strips (the boss's slam, a bomber's bombs) and smash the ones that run out. */
+/** Mark a strip of road for a blow that lands after `warn` ticks. Every mark but the bomber's is the boss's. */
+function mark(state: GameState, kind: Hazard["kind"], x: number, halfWidth: number, warn: number, share: number) {
+  state.hazards.push({ id: state.nextId++, kind, from: kind === "bomb" ? "plane" : "boss", x, halfWidth, ticks: warn, warn, share });
+}
+
+/**
+ * Set a missile or a keg off from in front of the boss toward `targetX`. It is as tough as `PROJECTILE_COLUMNS` of the
+ * squad's columns can shoot down in `hpSeconds`, the squad as it is right now.
+ */
+function launch(state: GameState, boss: Enemy, kind: Projectile["kind"], x: number, targetX: number) {
+  const { count, weapon } = state.squad;
+  const perColumn = (count / squadColumns(count)) * WEAPON_DPS[weapon] * state.damageMul;
+  const hp = Math.max(1, Math.round(perColumn * PROJECTILE_COLUMNS * PROJECTILE_STATS[kind].hpSeconds));
+  state.projectiles.push({ id: state.nextId++, kind, x, z: boss.z - BOSS_LAUNCH_AHEAD, targetX, hp });
+}
+
+/** Ticks before a missile or a keg reaches the squad. */
+export const ticksToLand = (state: GameState, p: Projectile) => (p.z - state.distance - CONTACT_DISTANCE) / (PROJECTILE_STATS[p.kind].speed / TICK_RATE);
+
+/**
+ * A boss's turn: it calls minions (more every time), grows enraged below half its hit points, and attacks in its own
+ * way once the last attack is over. Every attack is marked or seen coming, so there is always a way to get out of it.
+ */
+function actBoss(state: GameState, e: Enemy, fight: BossFight) {
+  if (!fight.enraged && e.hp <= e.maxHp * BOSS_FURY_AT) fight.enraged = true;
+  const pace = fight.enraged ? BOSS_FURY_PACE : 1;
+
+  if (fight.summon > 0) fight.summon--;
+  else {
+    // past a crowd that fits on the road, the minions come tougher instead of more
+    const count = Math.min(BOSS_MAX_MINIONS, Math.round(fight.minions));
+    const kind = BOSS_MINIONS[fight.kind];
+    if (count > 0) spawnGroup(state, kind, count, 0, 5, e.z - 3, Math.round(ENEMY_STATS[kind].hp * Math.max(1, fight.minions / count)));
+    fight.minions *= BOSS_SUMMON_GROWTH;
+    fight.summon = BOSS_SUMMON_INTERVAL;
+  }
+
+  const busy = state.projectiles.length > 0 || state.hazards.some((h) => h.from === "boss");
+  // the opening in the Mecha's shield moves now and then, but never under a laser that is about to fire
+  if (fight.gap !== null && !busy && --fight.gapTicks <= 0) {
+    fight.gap = pickRandom(state, MECH_GAPS.filter((x) => x !== fight.gap));
+    fight.gapTicks = Math.round(MECH_GAP_TICKS * pace);
+  }
+  if (fight.cooldown > 0) {
+    fight.cooldown--;
+    return;
+  }
+  if (busy) return;
+  fight.cooldown = Math.round(BOSS_ATTACK_INTERVAL[fight.kind] * pace);
+  const squad = state.squad;
+
+  if (fight.kind === "general") {
+    // a missile at the squad, or a salvo of three when enraged; each homes in on where the squad stands now, its blast on the road
+    const edge = LANE_HALF_WIDTH - PROJECTILE_STATS.missile.blast / 2;
+    const targets = fight.enraged ? [squad.x - MISSILE_SPREAD, squad.x, squad.x + MISSILE_SPREAD] : [squad.x];
+    targets.forEach((target, i) => launch(state, e, "missile", e.x + (i - (targets.length - 1) / 2) * MISSILE_TUBES, Math.max(-edge, Math.min(edge, target))));
+  } else if (fight.kind === "warlord") {
+    // a row of kegs across the road, one lane left open
+    const open = pickRandom(state, KEG_LANES);
+    for (const x of KEG_LANES) if (x !== open) launch(state, e, "keg", x, x);
+  } else if (fight.kind === "mech") {
+    // the laser fires down the opening: the one place the Mecha can be hurt from is the one place it shoots at
+    mark(state, "laser", fight.gap ?? 0, MECH_GAP_HALF_WIDTH, LASER_WARN, LASER_KILL_SHARE);
+  } else if (fight.kind === "yeti") {
+    // the ice first, where the squad stands; the slam right after it lands, where the squad is by then
+    if (fight.next === "ice") {
+      mark(state, "ice", squad.x, ICE_HALF_WIDTH, ICE_WARN, 1);
+      fight.cooldown = ICE_WARN + YETI_COMBO_GAP;
+      fight.next = "slam";
+    } else {
+      mark(state, "slam", squad.x, BOSS_SLAM_HALF_WIDTH, BOSS_SLAM_WARN, BOSS_SLAM_KILL_SHARE);
+      fight.next = "ice";
+    }
+  } else {
+    // meteors on all but one spot of the road, the clear one never on fire; two fall at once, three when enraged
+    const clear = METEOR_SPOTS.filter((x) => !state.fires.some((f) => Math.abs(f.x - x) < f.halfWidth));
+    const safe = pickRandom(state, clear.length ? clear : METEOR_SPOTS);
+    const others = METEOR_SPOTS.filter((x) => x !== safe);
+    if (!fight.enraged) others.splice(Math.floor(nextRandom(state) * others.length), 1);
+    for (const x of others) mark(state, "meteor", x, METEOR_HALF_WIDTH, METEOR_WARN, METEOR_KILL_SHARE);
+  }
+}
+
+/** Missiles fly and kegs roll toward the squad; one that gets there blows up on the soldiers in its strip. */
+function moveProjectiles(state: GameState) {
+  state.projectiles = state.projectiles.filter((p) => {
+    const stats = PROJECTILE_STATS[p.kind];
+    // a missile closes in on its mark so it gets there just as it reaches the squad
+    p.x += (p.targetX - p.x) / Math.max(1, ticksToLand(state, p));
+    p.z -= stats.speed / TICK_RATE;
+    if (p.z - state.distance > CONTACT_DISTANCE) return true;
+    const lost = loseSoldiers(state, Math.ceil(soldiersInStrip(state, p.targetX, stats.blast) * stats.share));
+    state.bossHits.push({ kind: p.kind, x: p.targetX, z: state.distance + 0.5, lost });
+    return false;
+  });
+}
+
+/** Count down the marked strips and let the ones that run out land: bombs, slams, lasers and meteors kill, ice freezes. */
 function resolveHazards(state: GameState) {
   state.hazards = state.hazards.filter((h: Hazard) => {
     if (--h.ticks > 0) return true;
-    const lost = loseSoldiers(state, Math.ceil(soldiersInStrip(state, h.x, h.halfWidth) * h.share));
-    if (h.kind === "slam") state.lastSlam = { x: h.x, tick: state.tick, lost };
-    else state.lastImpact = { kind: "bomb", x: h.x, z: state.distance + 8, tick: state.tick, lost };
+    const inStrip = soldiersInStrip(state, h.x, h.halfWidth);
+    if (h.kind === "ice") {
+      if (inStrip > 0) state.chill = { ticks: CHILL_TICKS, share: Math.min(1, inStrip / Math.max(1, state.squad.count)) };
+      state.bossHits.push({ kind: "ice", x: h.x, z: state.distance + 4, lost: inStrip });
+      return false;
+    }
+    const lost = loseSoldiers(state, Math.ceil(inStrip * h.share));
+    if (h.kind === "bomb") state.lastImpact = { kind: "bomb", x: h.x, z: state.distance + 8, tick: state.tick, lost };
+    else state.bossHits.push({ kind: h.kind, x: h.x, z: state.distance + 4, lost });
+    // a meteor leaves the road burning where it fell
+    if (h.kind === "meteor") state.fires.push({ id: state.nextId++, x: h.x, halfWidth: h.halfWidth, ticks: FIRE_TICKS });
     return false;
   });
+}
+
+/** The fire on the road takes a share of the soldiers standing in it every `FIRE_INTERVAL` ticks, until it goes out. */
+function burnFires(state: GameState) {
+  state.fires = state.fires.filter((f) => {
+    f.ticks--;
+    if (f.ticks % FIRE_INTERVAL === 0) {
+      // no rounding up: a few soldiers at the edge of the flames burn slowly, the fractions adding up in `lossCarry`
+      const lost = loseSoldiers(state, soldiersInStrip(state, f.x, f.halfWidth) * FIRE_BURN_SHARE);
+      if (lost > 0) state.bossHits.push({ kind: "fire", x: f.x, z: state.distance + 2, lost });
+    }
+    return f.ticks > 0;
+  });
+}
+
+/** With the boss dead, whatever it set in motion is over too: its missiles, kegs, marks, fires and ice. */
+function endFight(state: GameState) {
+  state.bossFight = null;
+  state.projectiles = [];
+  state.fires = [];
+  state.chill = null;
+  state.hazards = state.hazards.filter((h) => h.from !== "boss");
 }
 
 /** Start an air strike: the plane flies over and marks one strip after another, each smashed a moment after it is marked. */
@@ -352,7 +524,7 @@ function stepEvents(state: GameState) {
       for (const side of [-1, 1]) {
         const x = corridor + side * STRIKE_CORRIDOR_REACH;
         if (Math.abs(x) > LANE_HALF_WIDTH - 0.2) continue;
-        state.hazards.push({ id: state.nextId++, kind: "bomb", x, halfWidth: STRIKE_HALF_WIDTH, ticks: STRIKE_WARN, share: STRIKE_KILL_SHARE });
+        mark(state, "bomb", x, STRIKE_HALF_WIDTH, STRIKE_WARN, STRIKE_KILL_SHARE);
       }
     }
   }
@@ -378,11 +550,13 @@ export function step(state: GameState, input: Input): void {
   state.tick++;
   state.enemyShots = [];
   state.popped = [];
+  state.bossHits = [];
   const squad = state.squad;
+  const chill = state.chill;
 
-  // sliding across the road
+  // sliding across the road, slower with the Yeti's ice on the squad
   const edge = Math.max(0, LANE_HALF_WIDTH - squadHalfWidth(squad.count));
-  const reach = STRAFE_SPEED / TICK_RATE;
+  const reach = (STRAFE_SPEED / TICK_RATE) * (chill ? CHILL_SLOW : 1);
   if (input.target !== null) squad.x += Math.max(-reach, Math.min(reach, input.target - squad.x));
   else squad.x += Math.max(-1, Math.min(1, input.move)) * reach;
   squad.x = Math.max(-edge, Math.min(edge, squad.x));
@@ -405,8 +579,9 @@ export function step(state: GameState, input: Input): void {
   while (state.pending.length && state.pending[0].at <= state.distance) spawnWave(state, state.pending.shift()!);
 
   // shooting: every column fires straight ahead at the first thing it meets; tanks and helicopters pierce armor
+  // frozen soldiers do not shoot
   state.volleys = [];
-  const damage = (WEAPON_DPS[squad.weapon] * state.damageMul) / TICK_RATE;
+  const damage = ((WEAPON_DPS[squad.weapon] * state.damageMul) / TICK_RATE) * (chill ? 1 - chill.share : 1);
   columnXs(squad.x, squad.count).forEach((x, i) => {
     const target = firstTarget(state, x);
     if (target) target.apply(damage * soldiersInColumn(squad.count, i), false);
@@ -426,20 +601,29 @@ export function step(state: GameState, input: Input): void {
     return false;
   });
   state.barrels = state.barrels.filter((b) => b.z > state.distance - 2);
-  // a mine that was shot to pieces goes off harmlessly; one left behind is forgotten
+  // a mine, missile or keg that was shot to pieces goes off harmlessly; a mine left behind is forgotten
   state.traps = state.traps.filter((t) => {
     if (t.kind === "mine" && t.hp <= 0 && !t.used) {
-      state.popped.push({ x: t.x, z: t.z });
+      state.popped.push({ kind: "mine", x: t.x, z: t.z });
       return false;
     }
     return t.z > state.distance - 3;
   });
+  state.projectiles = state.projectiles.filter((p) => {
+    if (p.hp > 0) return true;
+    state.popped.push({ kind: p.kind, x: p.x, z: p.z });
+    return false;
+  });
+  if (state.bossFight && !bossOf(state)) endFight(state);
 
   // rebuilt by hand: the boss adds minions to `state.enemies` while it acts, and a filter would drop them
   const acting = state.enemies;
   state.enemies = [];
   for (const e of acting) if (actEnemy(state, e)) state.enemies.push(e);
+  moveProjectiles(state);
   resolveHazards(state);
+  burnFires(state);
+  if (state.chill && --state.chill.ticks <= 0) state.chill = null;
 
   if (state.status !== "playing") return;
   if (state.distance >= state.length && !bossOf(state)) state.status = "won";
