@@ -8,14 +8,20 @@
 </p>
 
 <p align="center">
+  <a href="https://squad-x-web-inky.vercel.app"><b>▶️ Jogar agora: squad-x-web-inky.vercel.app</b></a><br>
+  <sub>Abra no celular, em pé. Dá para instalar como app e jogar sem internet.</sub>
+</p>
+
+<p align="center">
   <img src="https://img.shields.io/badge/TypeScript-strict-3178C6?logo=typescript&logoColor=white" alt="TypeScript">
   <img src="https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black" alt="React 19">
   <img src="https://img.shields.io/badge/Three.js-3D-000000?logo=threedotjs&logoColor=white" alt="Three.js">
   <img src="https://img.shields.io/badge/Vite-7-646CFF?logo=vite&logoColor=white" alt="Vite 7">
   <img src="https://img.shields.io/badge/Bun-workspaces-000000?logo=bun&logoColor=white" alt="Bun">
-  <img src="https://img.shields.io/badge/testes-81-2ea44f" alt="81 testes">
+  <img src="https://img.shields.io/badge/testes-104-2ea44f" alt="104 testes">
   <img src="https://img.shields.io/badge/arte-100%25%20por%20c%C3%B3digo-ffb62e" alt="Arte 100% por código">
   <img src="https://img.shields.io/badge/custo-R%24%200%2Fm%C3%AAs-2ea44f" alt="Custo: R$ 0 por mês">
+  <a href="https://squad-x-web-inky.vercel.app"><img src="https://img.shields.io/badge/jogar-online-d2362f?logo=vercel&logoColor=white" alt="Jogar online"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/licen%C3%A7a-PolyForm%20Strict-6e7781" alt="Licença: PolyForm Strict"></a>
 </p>
 
@@ -38,7 +44,7 @@ Tudo é original: cada soldado, monstro, arma e som sai de código. Nenhum model
 - **Portais:** `+N` e `×N` ajudam, `-N` e `÷N` machucam. Os vermelhos com cadeado não dá para consertar a tiros; só existe um tipo de vermelho "bombeável", e só vale a pena com poder de fogo de sobra.
 - **Barris:** quebram em arma nova, veículo, soldados ou moedas. O barril na sua frente recebe o tiro até quebrar, então a ordem importa.
 - **Hordas:** zumbis, velocistas, brutamontes, policiais de choque (o tiro de soldado rende menos neles), homens-bomba (explodem em cadeia) e atiradores (recuam e atiram).
-- **Chefões:** cinco, um por mundo. Ficam parados na pista, visíveis de longe, e marcam no chão a faixa que vão esmagar. Quem não sai dela perde soldados.
+- **Chefões:** cinco, um por mundo, e cada um luta de um jeito: mísseis, barris explosivos rolando, escudo com laser, gelo com pancada e chuva de meteoros. Ficam parados na pista, visíveis de longe, e a barra de vida no topo mostra quanto falta.
 - **Perigos:** espinhos para desviar, minas para atirar de longe e, a partir da fase 6, um **bombardeiro** que deixa um corredor seguro entre as zonas vermelhas.
 - **Loja:** Dano, Reforços, Resistência e Butim. A campanha inteira é calibrada em volta dela (veja [Dificuldade](#-dificuldade-amarrada-à-loja)).
 
@@ -75,7 +81,25 @@ Cada tipo tem rosto, silhueta e jeito de correr próprios, e só entra numa fase
   <img src=".github/readme/chefoes.png" alt="O General, o Senhor da Guerra, o Mecha, o Yeti e o Demônio" width="100%">
 </p>
 
-O **General** (ponte), o **Senhor da Guerra** (deserto), o **Mecha** (cidade), o **Yeti** (neve) e o **Demônio** (vulcão), nas fases 5 e 10 de cada mundo. O esquadrão para a 14 unidades deles e só segue quando morrem. Eles esmagam a pista (aviso de 1,1 s) e chamam lacaios.
+Um por mundo, nas fases 5 e 10. O esquadrão para a 14 unidades deles e só segue quando morrem. Cada um ataca do seu jeito, e tudo o que ele lança é avisado antes, com um jeito de escapar:
+
+| Chefão | Mundo | Ataque | Como enfrentar | Lacaios |
+|---|---|---|---|---|
+| General | Ponte | Mísseis na sua faixa, com a mira marcada no chão (três de uma vez quando furioso) | Derrube no ar com as colunas embaixo dele, ou saia da mira | Zumbis |
+| Senhor da Guerra | Deserto | Uma fileira de barris explosivos rolando, com uma faixa livre | Vá para a faixa livre ou abra caminho a tiros. Os barris também protegem o chefão | Velocistas |
+| Mecha | Cidade | Escudo de energia com uma brecha que muda de lugar, e laser na brecha | Atire pela brecha (a faixa verde) e saia dela quando o laser marcar | Policiais de choque |
+| Yeti | Neve | Sopro de gelo e, logo em seguida, a pancada | Saia do azul: quem congela para de atirar e o esquadrão anda devagar | Brutamontes |
+| Demônio | Vulcão | Meteoros em todos os lugares menos um, e o chão pega fogo onde caem | Ache o lugar livre e fique fora das chamas | Homens-bomba |
+
+<p align="center">
+  <img src=".github/readme/chefoes-lutas.jpg" alt="As cinco lutas: o míssil do General, os barris do Senhor da Guerra, o escudo e o laser do Mecha, o gelo do Yeti e os meteoros do Demônio" width="100%">
+  <br>
+  <sub>Gravado no jogo, com o bot jogando: a mira do míssil, a fileira de barris com a faixa livre, a brecha verde e o laser, o gelo azul e os meteoros caindo.</sub>
+</p>
+
+Abaixo da metade da vida o chefão fica **furioso** (aura vermelha, ataques mais rápidos), e os lacaios vêm em ondas cada vez maiores: enrolar é perder. A vida dele é medida em segundos de tiro do esquadrão que um jogador típico leva até ali (12 s, ou 18 s no chefão que fecha o mundo), então nenhum cai num instante e nenhum dura minutos. Na prática, a luta leva de uns 10 a uns 60 segundos.
+
+Quando o chefão entra em vista, a barra de progresso vira a barra de vida dele, com o nome, o número e a marca da fúria. A parte vermelha cai na hora e um rastro claro vai atrás, então dá para ver quanto cada rajada tirou. Ao acordar, ele avisa o que faz.
 
 ### Armas e veículos
 
@@ -115,19 +139,21 @@ Cada mundo tem dez fases, com um chefão na 5 e na 10. As fases alternam entre *
 
 ## 🎚️ Dificuldade amarrada à loja
 
-O jogo é feito para quem **evolui**: passa a fase 1 e a 2, trava na 3 até comprar algo, e o chefão do fim exige ainda mais.
+O jogo é feito para quem **insiste e evolui**: passa a fase 1 e a 2, trava na 3 até comprar algo, e daí em diante cada fase costuma pedir algumas tentativas.
 
-- Um jogador "típico" (duas estrelas por fase, gastando tudo na loja) define o que cada fase espera do esquadrão.
-- Cada fase é calibrada **jogando-a com bots** para ser a mais difícil que ainda é vencível com o que esse jogador comprou, e, da fase 3 em diante, **não** vencível sem a loja.
-- Os números medidos nas 30 primeiras fases: com a loja esperada, o bot bom vence ~78% (e perde soldados em 95% das vitórias); sem a loja, ~7%; o bot que não se mexe, ~3%.
+- **Moedas:** a derrota não paga nada. A primeira vitória numa fase paga a recompensa dela, as estrelas e o saque dos barris. Vencer a mesma fase de novo paga 50%, depois 25%, depois nada; estrela nova (fazer melhor que antes) paga 25 🪙 sempre. Quem trava volta a fases já vencidas para juntar o que elas ainda rendem.
+- Um jogador "típico" define o que cada fase espera do esquadrão: duas estrelas por fase e, da fase 3 em diante, uma fase anterior vencida de novo antes de cada nova, gastando tudo na loja.
+- Cada fase é calibrada **jogando-a com bots** (8 partidas por tentativa de pressão) para ser a mais difícil em que esse jogador ainda vence **metade das tentativas** (um terço no chefão que fecha o mundo) e, da fase 3 em diante, **não** vencível sem a loja. As fases 1 e 2 são gentis.
+- Os números medidos nas 30 primeiras fases: com tudo o que esse jogador comprou, o bot bom vence ~60% de primeira (e perde soldados em 89% das vitórias); sem a loja, ~7%; o bot que não se mexe, ~3%.
+- **Teste de estresse:** um bot joga a campanha inteira como uma pessoa: compra na loja, repete a fase quando perde e, quando a próxima melhoria não cabe no bolso, volta a fases já vencidas para juntar moedas. O bot bom termina as 50 fases em **~220 partidas** (umas 110 tentativas e 110 voltas a fases antigas, perto de 4,5 por fase; as mais duras pedem de 9 a 14 tentativas). O bot médio, que erra um terço dos portais e não desvia de nada, para entre as fases 10 e 14: dali em diante o jogo pede quem aprende. `bun run stress` mostra fase a fase.
 
 <p align="center">
-  <img src=".github/readme/telas.jpg" alt="Menu, loja, bombardeio, chefão e relatório da fase" width="100%">
+  <img src=".github/readme/telas.jpg" alt="Menu, loja, bombardeio, o míssil do General e relatório da fase" width="100%">
   <br>
-  <sub>Menu avisando que você está atrás para a fase 7 · loja · bombardeio · o General esmagando a pista · relatório da fase.</sub>
+  <sub>Menu avisando que você está atrás para a fase 7 · loja · bombardeio · o míssil do General, com a mira marcada no chão · relatório da fase.</sub>
 </p>
 
-A tela sempre diz o que você tem (soldados, arma, veículos, melhorias) e o que acabou de acontecer (portal, barril, armadilha, bomba), e o relatório da fase mostra de onde veio cada moeda e o que derrubou o esquadrão.
+A tela sempre diz o que você tem (soldados, arma, veículos, melhorias), o que acabou de acontecer (portal, barril, armadilha, bomba) e, na luta, quanta vida o chefão ainda tem. O relatório da fase mostra de onde veio cada moeda e o que derrubou o esquadrão.
 
 ## ⚙️ Por dentro
 
@@ -137,10 +163,10 @@ A tela sempre diz o que você tem (soldados, arma, veículos, melhorias) e o que
 | Regras do jogo | `packages/engine`: TypeScript puro e determinístico, sem DOM |
 | Cliente | React 19 + Vite 7 para as telas e o HUD; a partida é desenhada em Three.js |
 | Arte | Montada por código a partir de formas simples, com sombreamento "toon" e contorno preto |
-| Som | Sintetizado em tempo real com Web Audio, sem nenhum arquivo de áudio |
+| Som | Sintetizado em tempo real com Web Audio, sem nenhum arquivo de áudio: efeitos em camadas com eco de sala, e uma música para o menu, outra para a fase e outra para o chefão |
 | Instalação | PWA: manifesto e service worker (`vite-plugin-pwa`); depois da primeira visita, joga sem internet |
 | Fases | Geradas por semente e calibradas por simulação (`bun run calibrate`) |
-| Testes | `bun test`: 81 testes, incluindo o equilíbrio das fases com e sem loja |
+| Testes | `bun test`: 104 testes, incluindo cada chefão, o equilíbrio das fases com e sem loja e a campanha inteira jogada por bots |
 
 ```mermaid
 flowchart LR
@@ -198,7 +224,8 @@ bun run dev      # Vite em http://localhost:5183
 Atalhos na URL para testar:
 
 - `?bot=1`: o bot da engine joga a fase sozinho (aparece o selo 🤖 BOT);
-- `?galeria=1`: a galeria dos modelos (soldado, inimigos, chefões, armas, veículos, perigos); arraste para girar.
+- `?galeria=1`: a galeria dos modelos (soldado, inimigos, chefões, armas, veículos, perigos); arraste para girar;
+- `?chefao=yeti`: a arena dos chefões, uma luta curta direto com o chefão (`general`, `warlord`, `mech`, `yeti` ou `demon`); a barra de baixo troca de chefão e alterna entre você e o bot.
 
 | Comando | O que faz |
 |---|---|
@@ -206,15 +233,16 @@ Atalhos na URL para testar:
 | `bun run typecheck` | Checagem de tipos da engine e do cliente |
 | `bun run build` | Build de produção do cliente |
 | `bun run calibrate` | Joga as 50 fases com bots e regrava a tabela de dificuldade |
+| `bun run stress` | Teste de estresse: bots jogam a campanha inteira comprando na loja e repetindo fases |
 | `bun run icons` | Redesenha os ícones do app (aba do navegador e tela inicial) |
 
-Mexeu em regra, gerador, bot ou loja? Rode `bun run calibrate` e depois `bun run test`.
+Mexeu em regra, gerador, bot ou loja? Rode `bun run calibrate`, depois `bun run test` e `bun run stress`.
 
 ## 📲 Instalar e publicar
 
-O jogo é um PWA: no Android o Chrome oferece "Instalar app"; no iPhone é Compartilhar → "Adicionar à Tela de Início". Depois da primeira visita ele abre e joga sem internet, e uma versão nova baixa em segundo plano e aparece na abertura seguinte. O progresso fica só no aparelho.
+O jogo está no ar em **[squad-x-web-inky.vercel.app](https://squad-x-web-inky.vercel.app)**. É um PWA: no Android o Chrome oferece "Instalar app"; no iPhone é Compartilhar → "Adicionar à Tela de Início". Depois da primeira visita ele abre e joga sem internet, e uma versão nova baixa em segundo plano e aparece na abertura seguinte (para ver um deploy novo, abra duas vezes). O progresso fica só no aparelho. Quando uma versão muda o jogo a ponto de o progresso antigo não fazer sentido (como a dos chefões com ataques próprios), todo mundo recomeça da fase 1, e o menu avisa.
 
-Instalar e jogar offline exigem HTTPS, então não valem pelo `http://<IP>:5183` do desenvolvimento: o service worker só existe no build de produção. Para publicar, o `vercel.json` já diz à [Vercel](https://vercel.com) como montar o cliente (free tier, sem servidor); basta importar o repositório.
+Instalar e jogar offline exigem HTTPS, então não valem pelo `http://<IP>:5183` do desenvolvimento: o service worker só existe no build de produção. A publicação é na [Vercel](https://vercel.com), no free tier e sem servidor: o `vercel.json` diz como montar o cliente, e cada push no `master` gera uma versão nova.
 
 ## 📁 Estrutura
 

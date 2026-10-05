@@ -10,12 +10,13 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [ ] Medir os quadros por segundo num celular de verdade, com esquadrão cheio e horda na tela: as contas de triângulos foram feitas no Mac, e é o celular que diz se bastou — P
 - [ ] Inimigos distantes mais leves: a horda nasce a 42 unidades, onde cada inimigo tem poucos pixels, mas é desenhada com o boneco inteiro (~2 a 4,6 mil triângulos cada). Hoje o pico de uma partida (~470 mil) é uma horda longe. Dá para usar a mesma ideia do soldado leve, escolhendo pela distância — M
 - [ ] Ajustar o que o teste no celular mostrar (câmera, sensibilidade do arrastar, tamanho do HUD) — M
-- [ ] Fase 1 mais gentil para quem erra portais: hoje só o bot "médio" perde nela — P 🎚️
-- [ ] Ouvir o som de verdade (hoje só confirmamos por contagem que dispara) e ajustar volume e timbre — P
+- [ ] Fase 1 mais gentil para quem erra portais: o bot "médio" leva de 9 a 17 tentativas nela, e como a derrota não paga, quem trava na fase 1 não tem como juntar moedas — P 🎚️
+- [ ] Ouvir o som novo no celular e ajustar volume e timbre (os níveis foram acertados medindo arquivos gravados do motor de som: tiros a ~−18 dB de pico, música a ~−10 dB, explosões a ~−5 dB) — P
 
 **Depois: o jogo**
 - [ ] Armas com efeito de verdade (cadência, perfuração, área) em vez de só dano por segundo — M 🎚️
-- [ ] Um comportamento próprio por chefão (o Yeti congela faixas, o Mecha atira nos lados, o Demônio chama fogo no chão) — M 🎚️
+- [ ] Algumas fases de "Correria" e "Enxame" (8, 22, 38, 39, 44, 46) calibram no teto da pressão (16): nelas a pressão quase não muda o resultado, porque quem decide são os portais. Dá para dar ao gerador outra alavanca nessas fases (mais portais ruins, menos tempo entre eles) — M 🎚️
+- [ ] A fase mais dura do jogador bom no teste de estresse ainda varia muito de uma campanha para outra (de 9 a 19 tentativas): vale olhar as fases que passam de 15 — P 🎚️
 - [ ] Mais eventos, como o bombardeiro: tempestade, meteoros, ponte que cede — M 🎚️
 - [ ] Modo **Defesa** (esquadrão parado, ondas, três cartas entre as ondas) e modo **Infinito** (sem fim, por pontuação) no mapa — G 🎚️
 - [ ] Dificuldades Difícil e Pesadelo por mundo, liberadas ao terminar o mundo — M 🎚️
@@ -29,7 +30,6 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 
 **Quando der: proteção e publicação**
 - [ ] CI no GitHub Actions: typecheck, testes e build a cada push — P
-- [ ] Publicar o cliente: importar o repositório na Vercel (free tier; o `vercel.json` já está pronto) e pôr o endereço no README e no `CLAUDE.md` — P
 - [ ] Conferir no celular, já pelo endereço publicado (precisa de HTTPS): instalar na tela inicial, abrir em modo avião e receber uma versão nova — P
 - [ ] Aviso de erros em produção (Sentry ou similar, plano grátis; conferir os limites antes) — P
 
@@ -47,7 +47,14 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [x] Barris com vida proporcional ao poder de fogo, que soltam arma, veículo, soldados ou moedas; o barril na faixa protege quem está atrás
 - [x] Veículos (moto, helicóptero e tanque) ao lado do esquadrão, com tiro próprio, até 4
 - [x] Inimigos: zumbi, velocista, brutamonte, policial de choque (armadura), homem-bomba (explode em cadeia) e atirador (recua e atira)
-- [x] Chefão por mundo, parado na pista, visível de longe: bloqueia o avanço, marca a faixa que vai esmagar (aviso de 1,1 s) e chama lacaios; a linha de chegada fica depois dele
+- [x] Chefão por mundo, parado na pista, visível de longe: bloqueia o avanço e chama lacaios; a linha de chegada fica depois dele
+- [x] Um ataque próprio por chefão: General (mísseis que dá para derrubar), Senhor da Guerra (barris explosivos rolando com uma faixa livre), Mecha (escudo com brecha e laser na brecha), Yeti (gelo que congela e pancada logo depois) e Demônio (meteoros e fogo no chão). Todo ataque é avisado e tem saída; o bot sabe enfrentar cada um
+- [x] Fúria abaixo de metade da vida (ataques mais rápidos, aura vermelha, marca na barra) e lacaios do próprio mundo em ondas 30% maiores a cada vez
+- [x] Vida do chefão em segundos de tiro do esquadrão esperado (12 s, 18 s no último do mundo; o Mecha 65%), sem depender da pressão. Antes as lutas iam de 4 s a 14 minutos e o chefão da fase 25 tinha 28 de vida; agora a mediana vai de 10 a 55 s
+- [x] Câmera que olha mais à frente na luta, para o chefão não ficar atrás do painel
+- [x] Míssil e barril explosivo com a vida do esquadrão de agora (antes os mísseis eram todos derrubados e os barris levavam 2 ou 3 soldados), míssil mais rápido, número de vida no barril explosivo e o barril rolando sobre o eixo (antes afundava na pista)
+- [x] Rastro do tiro âmbar, desenhado por cima da pista: o amarelo-claro somado virava branco na ponte
+- [x] Arena dos chefões (`?chefao=yeti`): uma luta curta direto com o chefão escolhido, que recomeça sozinha, com barra para trocar de chefão e de quem joga
 - [x] Armadilhas: espinhos (desviar) e minas (atirar de longe ou desviar)
 - [x] Bombardeiro a partir da fase 6: avião, zonas vermelhas com aviso e corredor seguro
 - [x] Modos de fase (Portais, Barris, Misto) e características (Enxame, Elite, Emboscada, Escassez, Correria, Armadilhas)
@@ -57,13 +64,20 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [x] A campanha é calibrada em volta da loja: fases 1 e 2 sem comprar nada; da 3 em diante o bot bom sem melhorias perde, e com o esperado vence cerca de 78% perdendo soldados no caminho
 - [x] Fase dimensionada pelo esquadrão medido por um bot, não por palpite (`SquadTrace`), com a medição repetida até estabilizar
 - [x] Calibração por simulação (`bun run calibrate`) com tabela gerada (`pressures.ts`), para o jogo não simular nada no celular
-- [x] Três bots (bom, médio, parado) e testes de equilíbrio com e sem loja (81 testes)
+- [x] Três bots (bom, médio, parado) e testes de equilíbrio com e sem loja
+- [x] Teste de estresse (`bun run stress` e `campaign.test.ts`): a campanha inteira jogada por bots que compram na loja, repetem a fase quando perdem e voltam a fases já vencidas para juntar moedas. Hoje o bot bom termina em ~220 partidas; o médio, que nunca aprende, para entre as fases 10 e 14
+- [x] Fases de chefão calibradas com 8 partidas (6 vitórias) em vez de 5, porque a luta varia mais (104 testes)
+- [x] Campanha que pede persistência: ~220 partidas para as 50 fases (umas 4,5 por fase, contando as voltas a fases antigas; as mais duras pedem 9 a 14 tentativas). A calibração exige metade das vitórias (um terço no chefão que fecha o mundo) com 8 partidas
+- [x] Economia "a primeira vez vale mais": derrota não paga; vencer a mesma fase de novo paga 50%, 25% e depois nada; estrela nova paga 25 🪙 sempre. Fecha o farm de morrer de propósito (rendia de 3 a 4 vezes mais por minuto que vencer) e o de repetir a mesma fase
+- [x] Traço do esquadrão como mediana de três partidas; chefão que acorda ao alcance dos tiros; vida do chefão esticada pela pressão entre 70% e 115%
 
 **Visual e som**
-- [x] Personagens montados por peças com contorno: soldado, seis inimigos, cinco chefões, quatro armas, três veículos, espinhos, mina, avião e bomba
+- [x] Personagens montados por peças com contorno: soldado, seis inimigos, cinco chefões, quatro armas, três veículos, espinhos, mina, avião, bomba, míssil, barril explosivo e meteoro; escudo do Mecha, fogo no chão e laser desenhados na cena
 - [x] Cenário próprio em cada mundo: ponte pênsil com água animada, deserto, cidade, neve e vulcão, com horizonte e clima
 - [x] Efeitos: clarão no cano, rastro luminoso, bola de fogo com onda de choque, fumaça, poeira e tremor de câmera
-- [x] Som sintetizado (tiros, acertos, portais, barris, veículos, explosões, chefão, bombardeio, música do menu e da batalha) e botão de mudo
+- [x] Som sintetizado e botão de mudo
+- [x] Sons mais realistas (pedido do usuário: "parece Super Nintendo"): tiros, explosões e golpes em camadas de ruído filtrado, tranco grave e eco de sala, cada disparo um pouco diferente e vindo do lado onde acontece; compressor no fim da mixagem; sons próprios para míssil, barris rolando, laser, gelo, meteoro, fogo crepitando e a fúria
+- [x] Música por momento: suave no menu, de ação na fase e mais tensa no chefão (entra quando ele acorda, fica mais pesada na fúria e volta quando ele cai), com troca suave entre elas
 - [x] Galeria `?galeria=1` para ver os modelos de perto e do ângulo do jogo
 
 **Desempenho**
@@ -76,12 +90,16 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [x] Painel do que você tem (soldados, arma, veículos, melhorias), avisos coloridos do que aconteceu e contadores que rolam
 - [x] Relatório da fase com a origem de cada moeda e o que derrubou o esquadrão; botão direto para a loja quando a fase pede melhorias
 - [x] Aviso no menu quando o jogador está atrás do esperado para a próxima fase
+- [x] Barra de vida do chefão no topo, no lugar da barra de progresso enquanto ele está à vista: nome, número e um rastro claro que mostra o dano de cada rajada; aviso "Chefão derrotado!" quando ele cai
+- [x] Cada chefão se apresenta ao acordar ("O General lança mísseis: derrube a tiros ou saia da mira"), e cada golpe diz o que levou ou que você escapou; o aviso grande ("SAIA DA FAIXA!", "SAIA DO FOGO!", "CONGELADOS!") empurra as mensagens em vez de cobri-las; mensagem repetida conta "×2"
 - [x] Telas com transição, botões com resposta e tudo respeitando `prefers-reduced-motion`
 
 **Instalação e publicação**
 - [x] PWA instalável: manifesto, ícones desenhados por código (`bun run icons`), tela cheia e em pé
 - [x] Joga sem internet depois da primeira visita: o service worker guarda o jogo inteiro (~1,1 MB); a versão nova baixa em segundo plano e entra na abertura seguinte, sem recarregar a página no meio de uma fase
 - [x] `vercel.json` para a Vercel montar o cliente (o mesmo esquema do Bomb Arena, sem servidor)
+- [x] Versão do save: uma versão nova pode zerar o progresso de todo mundo, com aviso no menu (usado na versão dos chefões novos)
+- [x] Publicado em https://squad-x-web-inky.vercel.app (a cada push no `master`), com o endereço no README, no `CLAUDE.md` e no "About" do GitHub, junto com a descrição e os tópicos do repositório
 
 **Documentação e licença**
 - [x] Licença PolyForm Strict 1.0.0, com permissão extra para pull requests (a mesma do Bomb Arena)
