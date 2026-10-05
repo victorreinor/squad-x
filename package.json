@@ -12,7 +12,8 @@
     "build": "bun run --cwd apps/web build",
     "test": "bun test packages",
     "typecheck": "tsc -p packages/engine --noEmit && tsc -p apps/web --noEmit",
-    "calibrate": "bun tools/calibrate.ts"
+    "calibrate": "bun tools/calibrate.ts",
+    "icons": "bun tools/make-icons.ts"
   },
   "devDependencies": {
     "@types/bun": "latest",
