@@ -57,12 +57,12 @@ As perdas passam por `loseSoldiers`, que aplica a Resistência e acumula as fra�
 O corpo do chefão é um `Enemy` (vida e posição, para levar tiro); o resto da luta fica em `state.bossFight` (`BossFight`). Quando o esquadrão chega a `BOSS_ACTIVE_RANGE`, a cada tick ele:
 
 - chama os lacaios do seu mundo de `BOSS_SUMMON_INTERVAL` em `BOSS_SUMMON_INTERVAL` ticks, cada grupo `BOSS_SUMMON_GROWTH` vezes maior que o anterior (enrolar é perder);
-- fica **furioso** abaixo de `BOSS_FURY_AT` da vida e passa a esperar menos entre os ataques (`BOSS_FURY_PACE`);
+- fica **furioso** abaixo de `BOSS_FURY_AT` da vida e passa a esperar menos entre os ataques (`BOSS_FURY_PACE`, um valor por chefão: 65% da espera, e 35% no General, cuja fúria é só o ritmo);
 - ataca quando o ataque anterior acabou (nenhum míssil ou barril na pista, nenhuma faixa marcada) e o tempo de espera passou:
 
 | Chefão | Ataque | Onde está a regra |
 |---|---|---|
-| General | Um míssil no lugar do esquadrão (três, furioso). Ele é alvo: as colunas embaixo dele o derrubam | `projectiles` (`kind: "missile"`), `moveProjectiles` |
+| General | Um míssil no lugar do esquadrão, sempre um de cada vez (furioso, um atrás do outro: a cada 1,4 s em vez de 4 s). Ele é alvo: as colunas embaixo dele o derrubam | `projectiles` (`kind: "missile"`), `moveProjectiles` |
 | Senhor da Guerra | Fileira de barris explosivos rolando, com uma faixa livre. Protegem o chefão como um barril comum | `projectiles` (`kind: "keg"`) |
 | Mecha | Escudo com uma brecha que muda de lugar (`gap`); o laser atira na brecha | `firstTarget` (escudo), faixa `laser` |
 | Yeti | Gelo na faixa do esquadrão e, logo depois, a pancada (`next`) | faixas `ice` e `slam`, `state.chill` |

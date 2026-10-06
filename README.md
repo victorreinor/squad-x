@@ -85,7 +85,7 @@ Um por mundo, nas fases 5 e 10. O esquadrão para a 14 unidades deles e só segu
 
 | Chefão | Mundo | Ataque | Como enfrentar | Lacaios |
 |---|---|---|---|---|
-| General | Ponte | Mísseis na sua faixa, com a mira marcada no chão (três de uma vez quando furioso) | Derrube no ar com as colunas embaixo dele, ou saia da mira | Zumbis |
+| General | Ponte | Mísseis na sua faixa, um de cada vez, com a mira marcada no chão (um atrás do outro quando furioso) | Derrube no ar com as colunas embaixo dele, ou saia da mira | Zumbis |
 | Senhor da Guerra | Deserto | Uma fileira de barris explosivos rolando, com uma faixa livre | Vá para a faixa livre ou abra caminho a tiros. Os barris também protegem o chefão | Velocistas |
 | Mecha | Cidade | Escudo de energia com uma brecha que muda de lugar, e laser na brecha | Atire pela brecha (a faixa verde) e saia dela quando o laser marcar | Policiais de choque |
 | Yeti | Neve | Sopro de gelo e, logo em seguida, a pancada | Saia do azul: quem congela para de atirar e o esquadrão anda devagar | Brutamontes |
@@ -123,7 +123,7 @@ Uma arma melhor troca a de **todos** os soldados. Os veículos correm ao lado do
 |---|---|---|
 | Espinhos | Mudar de faixa (não dá para atirar) | 40% dos soldados nas colunas sobre eles |
 | Mina | Atirar de longe (14 de vida) ou desviar | 60% dos soldados num raio de 1,7 |
-| Bombardeiro | Ficar no corredor sem vermelho; 1,6 s de aviso | 55% dos soldados dentro de cada bomba |
+| Bombardeiro | Ficar no corredor sem vermelho; 1,6 s de aviso | 30% dos soldados dentro de cada bomba, em 2 ou 3 passadas |
 
 Esquadrão pequeno desvia melhor; esquadrão grande aguenta mais. Cada colisão tira uma fração dos soldados das **colunas** atingidas, não de todos.
 
