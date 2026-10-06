@@ -32,7 +32,7 @@ export function App() {
   const play = (level: number) => setRun((r) => ({ level, id: (r?.id ?? 0) + 1 }));
   const onFinish = (r: RunResult) => setProgress((p) => recordRun(p, r.level, r.stars, r.coins));
 
-  if (run) return <Game key={run.id} level={run.level} upgrades={progress.upgrades} record={{ wins: progress.wins[run.level] ?? 0, best: progress.stars[run.level] ?? 0 }} onFinish={onFinish} onPlay={play} onShop={() => { setRun(null); setShop(true); }} onExit={() => setRun(null)} />;
+  if (run) return <Game key={run.id} level={run.level} upgrades={progress.upgrades} record={{ wins: progress.wins[run.level] ?? 0, best: progress.stars[run.level] ?? 0, frontier: progress.unlocked }} onFinish={onFinish} onPlay={play} onShop={() => { setRun(null); setShop(true); }} onExit={() => setRun(null)} />;
   if (shop) return <Shop progress={progress} onBuy={(kind) => setProgress((p) => purchase(p, kind))} onRefund={() => setProgress(refund)} onBack={() => setShop(false)} />;
   return <Home progress={progress} onPlay={play} onShop={() => setShop(true)} onReset={() => setProgress(resetProgress())} />;
 }

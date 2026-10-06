@@ -6,7 +6,7 @@ export interface Progress {
   unlocked: number;
   /** best stars per level number */
   stars: Record<number, number>;
-  /** how many times each level was won: a level pays less every time it is won again */
+  /** how many times each level was won: a level pays less every time it is won again (`replayShare`) */
   wins: Record<number, number>;
   coins: number;
   /** levels bought in the shop */
@@ -72,7 +72,7 @@ export function recordRun(p: Progress, level: number, stars: number, coins: numb
     unlocked: stars > 0 ? Math.max(p.unlocked, level + 1) : p.unlocked,
     stars: { ...p.stars, [level]: Math.max(p.stars[level] ?? 0, stars) },
     wins: stars > 0 ? { ...p.wins, [level]: (p.wins[level] ?? 0) + 1 } : p.wins,
-    coins: p.coins + runPayout(coins, stars, p.upgrades, level, p.wins[level] ?? 0, p.stars[level] ?? 0),
+    coins: p.coins + runPayout(coins, stars, p.upgrades, level, p.wins[level] ?? 0, p.stars[level] ?? 0, p.unlocked),
   };
   save(next);
   return next;

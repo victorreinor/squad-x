@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { COINS_PER_LEVEL, IDLE, SHOP_FROM_LEVEL, STAR_COINS, TICK_MS, botInput, campaignLevel, campaignSpec, createGame, levelReward, randomSeed, runPayout, bossOf, soldiersInStrip, starsFor, step, REPLAY_SHARES, type GameState, type Input, type LevelDef, type Upgrades } from "@squadx/engine";
+import { COINS_PER_LEVEL, IDLE, SHOP_FROM_LEVEL, STAR_COINS, TICK_MS, botInput, campaignLevel, campaignSpec, createGame, levelReward, randomSeed, replayShare, runPayout, bossOf, soldiersInStrip, starsFor, step, type GameState, type Input, type LevelDef, type Upgrades } from "@squadx/engine";
 import { Scene3D } from "./scene";
 import { audio } from "./audio";
 import { BOSS_IN_SIGHT, causeOfLoss, deriveFeed, type FeedItem } from "./feed";
@@ -19,6 +19,13 @@ export interface RunResult {
   count: number;
   losses: number;
   cause: string | null;
+}
+
+/** The level's record before the run, which decides what a win pays: earlier wins, best stars, and the level the player is on. */
+export interface RunRecord {
+  wins: number;
+  best: number;
+  frontier?: number;
 }
 
 interface Hud {
@@ -80,7 +87,7 @@ const sameHud = (a: Hud, b: Hud) =>
  * One run of one level: the 3D scene, the fixed-step loop and the HUD on top. `def` plays that road instead of the
  * campaign's level `level` (the boss arena), and then the run ends without the report card: the caller decides what next.
  */
-export function Game({ level, def, upgrades, record = { wins: 0, best: 0 }, onFinish, onPlay, onShop, onExit }: { level: number; def?: LevelDef; upgrades: Upgrades; record?: { wins: number; best: number }; onFinish: (r: RunResult) => void; onPlay: (level: number) => void; onShop: () => void; onExit: () => void }) {
+export function Game({ level, def, upgrades, record = { wins: 0, best: 0 }, onFinish, onPlay, onShop, onExit }: { level: number; def?: LevelDef; upgrades: Upgrades; record?: RunRecord; onFinish: (r: RunResult) => void; onPlay: (level: number) => void; onShop: () => void; onExit: () => void }) {
   const host = useRef<HTMLDivElement>(null);
   const [hud, setHud] = useState<Hud | null>(null);
   const [result, setResult] = useState<RunResult | null>(null);
@@ -286,11 +293,11 @@ export function Game({ level, def, upgrades, record = { wins: 0, best: 0 }, onFi
  * level had been won and its best stars before this run: a level pays less every time it is won again, and only new
  * stars pay.
  */
-function ResultCard({ result, upgrades, record, onPlay, onShop, onExit }: { result: RunResult; upgrades: Upgrades; record: { wins: number; best: number }; onPlay: (level: number) => void; onShop: () => void; onExit: () => void }) {
+function ResultCard({ result, upgrades, record, onPlay, onShop, onExit }: { result: RunResult; upgrades: Upgrades; record: RunRecord; onPlay: (level: number) => void; onShop: () => void; onExit: () => void }) {
   const { level } = result;
-  const total = runPayout(result.coins, result.stars, upgrades, level, record.wins, record.best);
+  const total = runPayout(result.coins, result.stars, upgrades, level, record.wins, record.best, record.frontier);
   const bonus = Math.round(COINS_PER_LEVEL * upgrades.coins * 100);
-  const share = REPLAY_SHARES[record.wins] ?? 0;
+  const share = replayShare(level, record.wins, record.frontier);
   const again = record.wins > 0 ? ` · ${Math.round(share * 100)}%` : "";
   const needsShop = !result.won && level >= SHOP_FROM_LEVEL;
   return (
