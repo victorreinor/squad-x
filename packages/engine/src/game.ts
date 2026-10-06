@@ -34,8 +34,6 @@ import {
   METEOR_KILL_SHARE,
   METEOR_SPOTS,
   METEOR_WARN,
-  MISSILE_SPREAD,
-  MISSILE_TUBES,
   PROJECTILE_COLUMNS,
   PROJECTILE_STATS,
   YETI_COMBO_GAP,
@@ -393,7 +391,7 @@ export const ticksToLand = (state: GameState, p: Projectile) => (p.z - state.dis
  */
 function actBoss(state: GameState, e: Enemy, fight: BossFight) {
   if (!fight.enraged && e.hp <= e.maxHp * BOSS_FURY_AT) fight.enraged = true;
-  const pace = fight.enraged ? BOSS_FURY_PACE : 1;
+  const pace = fight.enraged ? BOSS_FURY_PACE[fight.kind] : 1;
 
   if (fight.summon > 0) fight.summon--;
   else {
@@ -420,10 +418,9 @@ function actBoss(state: GameState, e: Enemy, fight: BossFight) {
   const squad = state.squad;
 
   if (fight.kind === "general") {
-    // a missile at the squad, or a salvo of three when enraged; each homes in on where the squad stands now, its blast on the road
+    // a missile at where the squad stands now, its blast on the road; enraged, still one at a time, only sooner
     const edge = LANE_HALF_WIDTH - PROJECTILE_STATS.missile.blast / 2;
-    const targets = fight.enraged ? [squad.x - MISSILE_SPREAD, squad.x, squad.x + MISSILE_SPREAD] : [squad.x];
-    targets.forEach((target, i) => launch(state, e, "missile", e.x + (i - (targets.length - 1) / 2) * MISSILE_TUBES, Math.max(-edge, Math.min(edge, target))));
+    launch(state, e, "missile", e.x, Math.max(-edge, Math.min(edge, squad.x)));
   } else if (fight.kind === "warlord") {
     // a row of kegs across the road, one lane left open
     const open = pickRandom(state, KEG_LANES);

@@ -89,9 +89,14 @@ export const BOSS_PRESSURE_RANGE = [0.7, 1.15] as const;
 export const BOSS_TOUGHNESS: Record<BossKind, number> = { general: 1, warlord: 1, mech: 0.65, yeti: 1, demon: 1 };
 /** ticks between two attacks of each boss */
 export const BOSS_ATTACK_INTERVAL: Record<BossKind, number> = { general: 120, warlord: 150, mech: 150, yeti: 180, demon: 170 };
-/** below this share of its hit points a boss is enraged, and from then on waits only this share of the time between attacks */
+/**
+ * below this share of its hit points a boss is enraged, and from then on waits only this share of the time between
+ * attacks. The General's fury is all in the pace, one missile right after the other: a salvo of three covered the whole
+ * road, so there was nowhere to stand. At this pace his fury weighs what the salvo did (his levels calibrate to the same
+ * pressure); any slower and the calibration makes up for it with a tougher boss and more minions
+ */
 export const BOSS_FURY_AT = 0.5;
-export const BOSS_FURY_PACE = 0.65;
+export const BOSS_FURY_PACE: Record<BossKind, number> = { general: 0.35, warlord: 0.65, mech: 0.65, yeti: 0.65, demon: 0.65 };
 /** the minions each boss calls: the enemy its world is known for */
 export const BOSS_MINIONS: Record<BossKind, EnemyKind> = { general: "runner", warlord: "sprinter", mech: "shield", yeti: "brute", demon: "bomber" };
 /** ticks between two groups of minions */
@@ -122,9 +127,6 @@ export const PROJECTILE_STATS: Record<Projectile["kind"], { speed: number; radiu
 export const PROJECTILE_COLUMNS = 3;
 /** how far in front of the boss its missiles and kegs set off (units) */
 export const BOSS_LAUNCH_AHEAD = 2.5;
-/** the General's salvo: how far apart his missiles leave his shoulders, and how far apart the three of an enraged one land (units) */
-export const MISSILE_TUBES = 1.4;
-export const MISSILE_SPREAD = 2.6;
 /** the lanes the Warlord's kegs roll down, one left open each time (x, units) */
 export const KEG_LANES = [-3, -1, 1, 3];
 

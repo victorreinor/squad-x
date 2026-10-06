@@ -13,8 +13,10 @@ import {
   ICE_WARN,
   IDLE,
   KEG_LANES,
+  LANE_HALF_WIDTH,
   MECH_GAP_TICKS,
   METEOR_SPOTS,
+  PROJECTILE_STATS,
   SKILLED_BOT,
   STRAFE_SPEED,
   TICK_RATE,
@@ -25,7 +27,10 @@ import {
   bossOf as findBoss,
   campaignLevel,
   createGame,
+  soldiersInStrip,
+  squadHalfWidth,
   step,
+  ticksToLand,
   type BossKind,
   type Enemy,
   type GameState,
@@ -101,7 +106,42 @@ describe("every boss", () => {
     angry.bossFight!.cooldown = 0;
     runUntil(angry, TICK_RATE * 5, (x) => x.hazards.length > 0);
     expect(angry.bossFight!.enraged).toBe(true);
-    expect(angry.bossFight!.cooldown).toBeLessThanOrEqual(Math.round(BOSS_ATTACK_INTERVAL.mech * BOSS_FURY_PACE));
+    expect(angry.bossFight!.cooldown).toBeLessThanOrEqual(Math.round(BOSS_ATTACK_INTERVAL.mech * BOSS_FURY_PACE.mech));
+  });
+
+  test("calm or enraged, no blow covers the whole road: a small squad always has a spot where it loses nothing", () => {
+    for (const kind of BOSS_KINDS) {
+      for (const enraged of [false, true]) {
+        const s = bossGame(kind, { startSquad: 4 });
+        atTheBoss(s);
+        s.bossFight!.cooldown = 0;
+        const room = LANE_HALF_WIDTH - squadHalfWidth(4);
+        let blows = 0;
+        for (let i = 0; i < TICK_RATE * 60; i++) {
+          if (enraged) bossOf(s).hp = bossOf(s).maxHp * 0.4;
+          // the worst case: nothing is shot down
+          for (const p of s.projectiles) p.hp = 1e9;
+          // what lands on this tick, and the fire already on the road
+          const marks = s.hazards.filter((h) => h.from === "boss" && h.kind !== "ice" && h.ticks === 1).map((h) => ({ x: h.x, half: h.halfWidth }));
+          const flying = s.projectiles.filter((p) => ticksToLand(s, p) <= 1).map((p) => ({ x: p.targetX, half: PROJECTILE_STATS[p.kind].blast }));
+          const strips = [...marks, ...flying, ...s.fires.map((f) => ({ x: f.x, half: f.halfWidth }))];
+          const caught = (x: number) => {
+            s.squad.x = x;
+            return strips.reduce((sum, strip) => sum + soldiersInStrip(s, strip.x, strip.half), 0);
+          };
+          // the squad stays where it is unless that costs it soldiers; then it is put on the spot that costs the least
+          const stood = s.squad.x;
+          let best = stood;
+          for (let x = -room; caught(best) > 0 && x <= room + 1e-6; x += 0.1) if (caught(x) < caught(best)) best = x;
+          expect(caught(best)).toBe(0);
+          if (marks.length + flying.length) blows++;
+          step(s, IDLE);
+        }
+        expect(s.bossFight!.enraged).toBe(enraged);
+        expect(blows).toBeGreaterThan(5);
+        expect(s.squad.count).toBe(4);
+      }
+    }
   });
 
   test("when it dies, what it set in motion is over too", () => {
@@ -142,13 +182,24 @@ describe("the General", () => {
     expect(s.squad.count).toBe(60);
   });
 
-  test("enraged, it fires a salvo of three", () => {
-    const s = bossGame("general");
-    atTheBoss(s);
-    bossOf(s).hp = bossOf(s).maxHp * 0.4;
-    s.bossFight!.cooldown = 0;
-    run(s, 1);
-    expect(s.projectiles.filter((p) => p.kind === "missile").length).toBe(3);
+  test("enraged, it still fires one missile at a time, only sooner", () => {
+    /** ticks between the first two launches, with the squad standing clear so no missile is shot down early */
+    const between = (enraged: boolean) => {
+      const s = bossGame("general", { startSquad: 3 });
+      atTheBoss(s);
+      if (enraged) bossOf(s).hp = bossOf(s).maxHp * 0.4;
+      s.bossFight!.cooldown = 0;
+      const launches: number[] = [];
+      const seen = new Set<number>();
+      for (let i = 0; i < TICK_RATE * 12 && launches.length < 2; i++) {
+        step(s, { move: 0, target: s.projectiles[0] ? (s.projectiles[0].targetX <= 0 ? 3.3 : -3.3) : null });
+        expect(s.projectiles.length).toBeLessThanOrEqual(1);
+        for (const p of s.projectiles) if (!seen.has(p.id)) (seen.add(p.id), launches.push(s.tick));
+      }
+      return launches[1] - launches[0];
+    };
+    expect(between(false)).toBe(BOSS_ATTACK_INTERVAL.general + 1);
+    expect(between(true)).toBe(Math.round(BOSS_ATTACK_INTERVAL.general * BOSS_FURY_PACE.general) + 1);
   });
 });
 
