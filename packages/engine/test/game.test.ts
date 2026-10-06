@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { BOSS_STANDOFF, BOSS_SLAM_WARN, IDLE, SKILLED_BOT, botInput, MAX_VEHICLES, RUN_SPEED, SHOOTER_RANGE, TICK_RATE, createGame, squadColumns, starsFor, step, vehicleXs, type Enemy, type GameState, type LevelDef } from "../src";
+import { BOSS_STANDOFF, BOSS_SLAM_WARN, IDLE, LANE_HALF_WIDTH, SKILLED_BOT, STRIKE_MAX_PASSES, botInput, MAX_VEHICLES, RUN_SPEED, SHOOTER_RANGE, TICK_RATE, createGame, soldiersInStrip, squadColumns, squadHalfWidth, starsFor, step, vehicleXs, type Enemy, type GameState, type LevelDef } from "../src";
 import { emptyLevel, run } from "./helpers";
 
 const gate = (over: Partial<ReturnType<typeof emptyLevel>["gates"][number]> = {}) => ({ x: 0, z: 20, width: 8, op: "add" as const, value: 5, ...over });
@@ -304,6 +304,32 @@ describe("air strikes", () => {
     const dodge = strike({ startSquad: 3 });
     for (let i = 0; i < TICK_RATE * 8; i++) step(dodge, botInput(dodge, SKILLED_BOT));
     expect(dodge.squad.count).toBe(3);
+  });
+
+  test("the safe corridor holds a squad of five columns, and a squad too wide for it loses a part of itself, not most of it", () => {
+    /** the share of the squad a whole strike takes, the squad put on the spot that costs the least before every bomb lands */
+    const lostAtBest = (startSquad: number, seed: number) => {
+      const s = createGame(emptyLevel({ startSquad, events: [{ at: 12, kind: "airstrike", bombs: STRIKE_MAX_PASSES }] }), seed);
+      const room = LANE_HALF_WIDTH - squadHalfWidth(startSquad);
+      for (let i = 0; i < TICK_RATE * 10; i++) {
+        const landing = s.hazards.filter((h) => h.kind === "bomb" && h.ticks === 1);
+        const caught = (x: number) => {
+          s.squad.x = x;
+          return landing.reduce((sum, h) => sum + soldiersInStrip(s, h.x, h.halfWidth), 0);
+        };
+        let best = s.squad.x;
+        for (let x = -room; landing.length && x <= room + 1e-6; x += 0.1) if (caught(x) < caught(best)) best = x;
+        s.squad.x = best;
+        step(s, IDLE);
+      }
+      return 1 - s.squad.count / startSquad;
+    };
+    const seeds = Array.from({ length: 20 }, (_, i) => i + 1);
+    for (const seed of seeds) expect(lostAtBest(25, seed)).toBe(0);
+    const wide = seeds.map((seed) => lostAtBest(400, seed));
+    expect(Math.max(...wide)).toBeLessThanOrEqual(0.36);
+    // and the strike does take something from the wide squad: this is not a test of an empty sky
+    expect(Math.max(...wide)).toBeGreaterThan(0.1);
   });
 
   test("the strike happens once, at the distance it was set for", () => {

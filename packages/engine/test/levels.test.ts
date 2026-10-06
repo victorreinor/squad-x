@@ -8,6 +8,7 @@ import {
   LEVEL_TWISTS,
   NO_UPGRADES,
   SPAWN_AHEAD,
+  STRIKE_MAX_PASSES,
   botInput,
   SHOP_FROM_LEVEL,
   calibratePressure,
@@ -195,6 +196,11 @@ describe("length and punishment", () => {
     expect(all.some((l) => l.traps.some((t) => t.kind === "mine"))).toBe(true);
     // a dividing gate is always locked: shooting it up never helps
     for (const l of all) for (const g of l.gates) if (g.op === "div") expect(g.locked).toBe(true);
+  });
+
+  test("an air strike never has more passes of bombs than the most", () => {
+    const strikes = wide.flatMap((n) => campaignLevel(n).events);
+    expect(Math.max(...strikes.map((e) => e.bombs))).toBe(STRIKE_MAX_PASSES);
   });
 
   test("the learning levels have no traps, no air strikes and no dividing gates", () => {

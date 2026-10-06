@@ -1,4 +1,4 @@
-import { BOSS_FIGHT_SECONDS, BOSS_FINAL_FIGHT_SECONDS, BOSS_MINION_SECONDS, BOSS_ACTIVE_RANGE, BOSS_MINIONS, BOSS_PRESSURE_RANGE, BOSS_TOUGHNESS, ENEMY_STATS, LANE_HALF_WIDTH, MAX_SQUAD, VEHICLE_STATS, WEAPON_DPS } from "./constants";
+import { BOSS_FIGHT_SECONDS, BOSS_FINAL_FIGHT_SECONDS, BOSS_MINION_SECONDS, BOSS_ACTIVE_RANGE, BOSS_MINIONS, BOSS_PRESSURE_RANGE, BOSS_TOUGHNESS, ENEMY_STATS, LANE_HALF_WIDTH, MAX_SQUAD, STRIKE_MAX_PASSES, STRIKE_PASSES, VEHICLE_STATS, WEAPON_DPS } from "./constants";
 import { nextRandom } from "./rng";
 import {
   BOSS_KINDS,
@@ -383,7 +383,7 @@ export function generateLevel(spec: LevelSpec): LevelDef {
   }
 
   // from level 6 the world attacks on its own: bombers fly over at set points of the run
-  for (let k = 0; k < spec.strikes; k++) level.events.push({ at: Math.round(z * (spec.strikes === 1 ? 0.55 : 0.35 + k * 0.35)), kind: "airstrike", bombs: 2 + Math.min(2, spec.world) });
+  for (let k = 0; k < spec.strikes; k++) level.events.push({ at: Math.round(z * (spec.strikes === 1 ? 0.55 : 0.35 + k * 0.35)), kind: "airstrike", bombs: Math.min(STRIKE_MAX_PASSES, STRIKE_PASSES + spec.world) });
 
   if (spec.boss) {
     const at = Math.round(z + 12);

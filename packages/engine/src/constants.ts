@@ -193,10 +193,17 @@ export const MINE_HP = 14;
 export const MINE_RADIUS = 1.7;
 export const MINE_KILL_SHARE = 0.6;
 
-/** an air strike: how many ticks of warning the player gets, how wide each bomb's blast is (half-width, units) and the share it kills */
+/**
+ * an air strike: how many ticks of warning the player gets, how wide each bomb's blast is (half-width, units) and the
+ * share it kills. The safe corridor holds five to seven columns and a squad of 65 or more spreads into nine, so a wide
+ * squad takes a part of every pass whatever it does: the share is the one a boss's blow takes, not more
+ */
 export const STRIKE_WARN = 48;
 export const STRIKE_HALF_WIDTH = 1.15;
-export const STRIKE_KILL_SHARE = 0.55;
+export const STRIKE_KILL_SHARE = 0.3;
+/** passes of bombs in one air strike: this many in the first world, one more per world after it, up to the most */
+export const STRIKE_PASSES = 2;
+export const STRIKE_MAX_PASSES = 3;
 /** the middles of the safe corridors an air strike can leave, and how far the bombs fall from the middle of one (units) */
 export const STRIKE_CORRIDORS = [-2.4, 0, 2.4];
 export const STRIKE_CORRIDOR_REACH = 3.7;
