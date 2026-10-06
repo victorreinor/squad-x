@@ -3,7 +3,7 @@ import { campaignLevel } from "./calibrate";
 import { TICK_RATE } from "./constants";
 import { bossOf, createGame, starsFor, step } from "./game";
 import { LEVELS_PER_WORLD } from "./levels";
-import { NO_UPGRADES, REPLAY_SHARES, runPayout, spendLikeATypicalPlayer, type Upgrades } from "./upgrades";
+import { NO_UPGRADES, replayShare, runPayout, spendLikeATypicalPlayer, type Upgrades } from "./upgrades";
 import type { LevelDef } from "./types";
 
 /** How one level of a simulated campaign went. */
@@ -40,8 +40,8 @@ export function playCampaign(skill: BotSkill = SKILLED_BOT, { levels = LEVELS_PE
   const wins: number[] = [];
   const best: number[] = [];
   const total = (u: Upgrades) => u.damage + u.squad + u.armor;
-  /** One run of level `n`: banks what it pays and goes shopping. Returns the finished run, and the boss fight's length. */
-  const play = (n: number, level: LevelDef): { won: boolean; stars: number; fight: number | null } => {
+  /** One run of level `n` while stuck on `frontier`: banks what it pays and goes shopping. Returns the finished run, and the boss fight's length. */
+  const play = (n: number, level: LevelDef, frontier = n): { won: boolean; stars: number; fight: number | null } => {
     // every try its own luck, and its own slips
     const player: BotSkill = { ...skill, slips: runSeed };
     const state = createGame(level, (runSeed++ * 2654435761) >>> 0, owned);
@@ -54,7 +54,7 @@ export function playCampaign(skill: BotSkill = SKILLED_BOT, { levels = LEVELS_PE
       if (woke >= 0 && fight === null && (!bossOf(state) || state.status !== "playing")) fight = (state.tick - woke) / TICK_RATE;
     }
     const stars = starsFor(state);
-    wallet += runPayout(state.coins, stars, owned, n, wins[n] ?? 0, best[n] ?? 0);
+    wallet += runPayout(state.coins, stars, owned, n, wins[n] ?? 0, best[n] ?? 0, frontier);
     if (stars > 0) {
       wins[n] = (wins[n] ?? 0) + 1;
       best[n] = Math.max(best[n] ?? 0, stars);
@@ -82,9 +82,9 @@ export function playCampaign(skill: BotSkill = SKILLED_BOT, { levels = LEVELS_PE
       const before = total(owned);
       let back = 0;
       for (let earlier = n - 1; earlier >= 1 && back < REPLAYS_PER_LOSS && total(owned) === before; earlier--) {
-        if ((wins[earlier] ?? 0) >= REPLAY_SHARES.length) continue;
+        if (replayShare(earlier, wins[earlier] ?? 0, n) === 0) continue;
         back++;
-        play(earlier, campaignLevel(earlier));
+        play(earlier, campaignLevel(earlier), n);
       }
       replays += back;
     }

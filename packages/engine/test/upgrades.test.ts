@@ -8,7 +8,9 @@ import {
   buyUpgrade,
   createGame,
   expectedUpgrades,
+  REPLAY_FLOOR,
   REPLAY_SHARES,
+  REPLAY_WINDOW,
   STAR_COINS,
   levelReward,
   lossMultiplier,
@@ -93,13 +95,25 @@ describe("upgrades", () => {
     expect(runPayout(30, 0, NO_UPGRADES, 20)).toBe(0);
   });
 
-  test("winning a level again pays less every time, then nothing, but a better score always pays its new stars", () => {
+  test("winning a level again pays less every time, but a better score always pays its new stars", () => {
     const reward = 20 + levelReward(5);
     expect(runPayout(20, 2, NO_UPGRADES, 5, 1, 2)).toBe(Math.round(reward * REPLAY_SHARES[1]));
     expect(runPayout(20, 2, NO_UPGRADES, 5, 2, 2)).toBe(Math.round(reward * REPLAY_SHARES[2]));
-    expect(runPayout(20, 2, NO_UPGRADES, 5, 3, 2)).toBe(0);
-    expect(runPayout(20, 3, NO_UPGRADES, 5, 3, 1)).toBe(2 * STAR_COINS);
+    expect(runPayout(20, 3, NO_UPGRADES, 5, 1, 2)).toBe(Math.round(reward * REPLAY_SHARES[1]) + STAR_COINS);
     expect(REPLAY_SHARES[1]).toBeLessThan(REPLAY_SHARES[0]);
+  });
+
+  test("after that, the ten levels behind the player pay the floor for good, and older ones pay nothing", () => {
+    const reward = 20 + levelReward(15);
+    // stuck on level 18: level 15 is three behind, level 5 thirteen
+    expect(runPayout(20, 2, NO_UPGRADES, 15, 3, 2, 18)).toBe(Math.round(reward * REPLAY_FLOOR));
+    expect(runPayout(20, 2, NO_UPGRADES, 15, 9, 2, 18)).toBe(Math.round(reward * REPLAY_FLOOR));
+    expect(runPayout(20, 2, NO_UPGRADES, 5, 3, 2, 18)).toBe(0);
+    expect(runPayout(20, 3, NO_UPGRADES, 5, 3, 1, 18)).toBe(2 * STAR_COINS);
+    // on the first level of a world the window reaches back into the world before
+    const oldest = 21 - REPLAY_WINDOW;
+    expect(runPayout(20, 2, NO_UPGRADES, oldest, 3, 2, 21)).toBe(Math.round((20 + levelReward(oldest)) * REPLAY_FLOOR));
+    expect(runPayout(20, 2, NO_UPGRADES, oldest - 1, 3, 2, 21)).toBe(0);
   });
 });
 

@@ -43,18 +43,30 @@ export const STAR_COINS = 25;
 
 /**
  * The share of a level's reward and loot a win pays, by how many times the level was won before: in full the first
- * time, then half, then a quarter, then nothing. Winning the same level over and over is not a way to fill the wallet.
+ * time, then half, then a quarter. Winning the same level over and over is not a way to fill the wallet.
  */
 export const REPLAY_SHARES = [1, 0.5, 0.25];
 
 /**
- * What a run pays. A lost run pays nothing. A win pays the level's reward and what was picked up, by `REPLAY_SHARES`
- * after `wins` earlier wins of the level, and `STAR_COINS` for each star above the level's `best`, every time. All of
- * it is raised by the coin upgrade.
+ * How many levels behind the one the player is on keep paying `REPLAY_FLOOR` for good once `REPLAY_SHARES` runs out:
+ * a stuck player always has a slow way to the next upgrade, even on the first level of a world. Older levels pay nothing.
  */
-export function runPayout(coins: number, stars: number, u: Upgrades, level = 1, wins = 0, best = 0): number {
+export const REPLAY_WINDOW = 10;
+/** The share of its reward and loot a level in the `REPLAY_WINDOW` pays from its fourth win on. */
+export const REPLAY_FLOOR = 0.25;
+
+/** The share of its reward and loot a win of `level` pays after `wins` earlier wins, for a player who is on level `frontier`. */
+export const replayShare = (level: number, wins: number, frontier = level) =>
+  REPLAY_SHARES[wins] ?? (frontier - level <= REPLAY_WINDOW ? REPLAY_FLOOR : 0);
+
+/**
+ * What a run pays. A lost run pays nothing. A win pays the level's reward and what was picked up, by `replayShare`
+ * after `wins` earlier wins of the level, and `STAR_COINS` for each star above the level's `best`, every time. All of
+ * it is raised by the coin upgrade. `frontier` is the level the player is on: the first one not won yet.
+ */
+export function runPayout(coins: number, stars: number, u: Upgrades, level = 1, wins = 0, best = 0, frontier = level): number {
   if (stars === 0) return 0;
-  const share = REPLAY_SHARES[wins] ?? 0;
+  const share = replayShare(level, wins, frontier);
   return Math.round(((coins + levelReward(level)) * share + Math.max(0, stars - best) * STAR_COINS) * (1 + COINS_PER_LEVEL * u.coins));
 }
 
