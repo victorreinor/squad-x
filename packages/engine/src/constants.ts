@@ -117,11 +117,14 @@ export const BOSS_SLAM_KILL_SHARE = 0.3;
  * what the bosses send down the road, per kind (the General's missile, the Warlord's explosive keg): speed (units/s),
  * body radius for the columns that shoot it (units), half-width of its blast (units), the share of the soldiers in the
  * blast it kills, and its hit points in seconds of the fire of `PROJECTILE_COLUMNS` of the squad's columns, as the squad
- * is when it is launched (s): the same challenge for 40 soldiers or 400, and more damage from the shop shoots it down sooner
+ * is when it is launched (s): the same challenge for 40 soldiers or 400, and more damage from the shop shoots it down sooner.
+ * A keg takes no more than the other bosses' blows (25% to 40% of the strip): a wide squad cannot get out of a row of
+ * three, and at 60% each row took nearly half of it, so only a squad twice the expected size lived through the fight.
+ * Its hit points stay: any fewer and a small squad standing still shoots every keg down in time, with nothing to dodge
  */
 export const PROJECTILE_STATS: Record<Projectile["kind"], { speed: number; radius: number; blast: number; share: number; hpSeconds: number }> = {
   missile: { speed: 9, radius: 0.5, blast: 1.2, share: 0.5, hpSeconds: 0.9 },
-  keg: { speed: 4.5, radius: 0.7, blast: 1, share: 0.6, hpSeconds: 1.7 },
+  keg: { speed: 4.5, radius: 0.7, blast: 1, share: 0.35, hpSeconds: 1.7 },
 };
 /** how many of the squad's columns a missile or a keg is sized against: about as many as stand under one */
 export const PROJECTILE_COLUMNS = 3;

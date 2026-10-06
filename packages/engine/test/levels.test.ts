@@ -259,10 +259,12 @@ describe("balance, tied to the shop", () => {
   }, slow);
 
   test("bosses are beatable with the shop, and not without it", () => {
-    // half the tries for a boss halfway through a world, a third for the one that closes it
-    const bosses = [5, 10, 15, 20, 25, 30];
-    expect(wins(withShop, bosses)).toBeGreaterThanOrEqual(2);
-    expect(wins(withoutShop, bosses)).toBe(0);
+    // a boss fight is all or nothing, so every boss level leaves a good player a wide margin: before it, they won 69%
+    const bosses = [5, 10, 15, 20, 25, 30, 35, 40, 45, 50];
+    const tries = [1, 2, 3, 4, 5, 6, 7, 8];
+    const won = bosses.flatMap((n) => tries.filter((t) => play(campaignLevel(n), seedOf(n) + t, (s) => botInput(s), expectedUpgrades(n)).status === "won"));
+    expect(won.length / (bosses.length * tries.length)).toBeGreaterThanOrEqual(0.8);
+    expect(wins(withoutShop, bosses.slice(0, 6))).toBe(0);
   }, slow);
 
   test("the table of pressures is in step with the generator: calibrating again gives the same answers", () => {

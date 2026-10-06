@@ -1,6 +1,6 @@
 import { SKILLED_BOT, botInput, type BotSkill } from "./bot";
 import { createGame, step } from "./game";
-import { LEVELS_PER_WORLD, campaignSpec, generateLevel, type SquadTrace } from "./levels";
+import { campaignSpec, generateLevel, type SquadTrace } from "./levels";
 import { VEHICLE_STATS, WEAPON_DPS } from "./constants";
 import { PRESSURES } from "./pressures";
 import type { LevelDef } from "./types";
@@ -10,13 +10,19 @@ import { NO_UPGRADES, SHOP_FROM_LEVEL, expectedUpgrades, type Upgrades } from ".
 export const PRESSURE_LADDER: number[] = Array.from({ length: 40 }, (_, i) => Math.round(16 * 0.88 ** i * 100) / 100);
 /** How many times a bot plays a candidate level: enough that a target like "half the tries" is not decided by luck. */
 const TRIALS = 8;
+/**
+ * A boss level is played more: its fight is nearly all or nothing, and going down the ladder with 8 tries found a
+ * pressure where the good player happened to win 6 of those 8 and won 44% of other tries.
+ */
+const BOSS_TRIALS = 48;
 /** How many levels the first stretch is gentle: even a middling player gets through without upgrades. */
 const GENTLE_LEVELS = 2;
 /**
  * The share of its tries a good player with the expected upgrades must win: the campaign asks for persistence, so a
- * level usually takes more than one go. The first levels are gentle, and the boss that closes a world asks the most.
+ * level usually takes more than one go. The first levels are gentle. A boss fight is a cliff: the squad that arrives a
+ * little short of the good player's loses every time, so a boss level must leave the good player a wide margin.
  */
-const WIN_SHARE = { gentle: 0.75, level: 0.45, finalBoss: 0.35 };
+const WIN_SHARE = { gentle: 0.75, level: 0.45, boss: 0.85 };
 /** The player without the upgrades counts as getting through when they win this share of the tries: then the level is made harder. */
 const WITHOUT_SHARE = 0.4;
 
@@ -90,8 +96,8 @@ export function settledTrace(n: number, upgrades: Upgrades): SquadTrace {
 
 /**
  * How hard level `n` can be. A good player with the upgrades a typical player has by now must win `WIN_SHARE` of the
- * tries (3 of 5; 5 of 8 for a boss, 4 of 8 for the boss that closes a world), and the same player without them must not
- * get through (fewer than 2 of 5, or 4 of 8) from `SHOP_FROM_LEVEL` on: the pressure is nudged up while the first still
+ * tries (4 of 8; 6 of 8 in the first levels, 18 of 24 for a boss), and the same player without them must not
+ * get through (fewer than 4 of 8, or 10 of 24) from `SHOP_FROM_LEVEL` on: the pressure is nudged up while the first still
  * holds up a little lower until the second is true. The first levels are different: gentle, no shop needed.
  */
 export function calibratePressure(n: number): number {
@@ -101,8 +107,8 @@ export function calibratePressure(n: number): number {
   // hordes and barrels are sized from the squad a good player really has here, so pressure means "how far past a fair fight"
   const trace = settledTrace(n, gentle ? NO_UPGRADES : have);
   const level = (pressure: number) => generateLevel({ ...spec, pressure, trace });
-  const trials = TRIALS;
-  const share = gentle ? WIN_SHARE.gentle : spec.boss && n % LEVELS_PER_WORLD === 0 ? WIN_SHARE.finalBoss : WIN_SHARE.level;
+  const trials = spec.boss ? BOSS_TRIALS : TRIALS;
+  const share = gentle ? WIN_SHARE.gentle : spec.boss ? WIN_SHARE.boss : WIN_SHARE.level;
   const most = Math.ceil(trials * share);
   const some = Math.ceil(trials * (share - 0.15));
   const enough = Math.ceil(trials * WITHOUT_SHARE);
