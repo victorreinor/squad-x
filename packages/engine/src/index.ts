@@ -7,3 +7,4 @@ export * from "./types";
 export * from "./upgrades";
 export * from "./calibrate";
 export * from "./campaign";
+export * from "./siege";

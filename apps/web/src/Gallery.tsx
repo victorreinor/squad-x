@@ -4,10 +4,11 @@ import { BOSS_KINDS, type EnemyKind, type WeaponKind } from "@squadx/engine";
 import { Crowd, partsToGroup, toonRamp } from "./game/crowd";
 import { BOSS_FIGURES, BOSS_SCALE, ENEMY_LOOKS, soldierFigure, weaponParts } from "./game/figures";
 import { TextSprite } from "./game/labels";
+import { OGRE_SCALE, brawlerFigure, knightFigure, legionnaireFigure, ogreFigure } from "./game/siegeFigures";
 import { KEG_AXLE, bombParts, kegParts, meteorParts, mineParts, missileParts, planeParts, spikesParts } from "./game/props";
 import { buildVehicle } from "./game/vehicles";
 
-const TABS = ["soldado", "inimigos", "chefoes", "armas", "veiculos", "perigos"] as const;
+const TABS = ["soldado", "inimigos", "chefoes", "armas", "veiculos", "perigos", "cerco"] as const;
 type Tab = (typeof TABS)[number];
 
 const ENEMIES: Exclude<EnemyKind, "boss">[] = ["runner", "sprinter", "brute", "shield", "bomber", "shooter"];
@@ -65,6 +66,14 @@ export function Gallery() {
       // the squad is seen from behind in the game; the front shows the face and the rifle
       WEAPONS.forEach((w, i) => figure(soldierFigure(w), -7.2 + i * 2.2, 1.5, 0, `${w} · costas`));
       WEAPONS.forEach((w, i) => figure(soldierFigure(w), 1.6 + i * 2.2, 1.5, Math.PI, `${w} · frente`));
+    } else if (tab === "cerco") {
+      // the siege mode: the knight from behind and from the front, the legionnaire and the ogre that leads the legion
+      figure(knightFigure(), -6.2, 1.5, 0, "cavaleiro · costas");
+      figure(knightFigure(), -3.6, 1.5, Math.PI, "cavaleiro · frente");
+      figure(legionnaireFigure(), -1, 1.5, Math.PI, "legionário");
+      figure(brawlerFigure(), 2, 1.5, Math.PI, "campeão");
+      figure(ogreFigure(), 6, OGRE_SCALE * 0.62, Math.PI, "ogro da legião");
+      spread = 15;
     } else if (tab === "inimigos") {
       ENEMIES.forEach((k, i) => figure(ENEMY_LOOKS[k].figure(), (i - 2.5) * 2.3, ENEMY_LOOKS[k].scale * 1.25, Math.PI, k));
       spread = 6;
