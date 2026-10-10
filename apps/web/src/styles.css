@@ -434,6 +434,45 @@ h2,
   top: -9px;
   font-size: 22px;
 }
+/* siege mode (?modo=cerco): how many soldiers the red legion has left */
+.legion-bar {
+  position: relative;
+  margin-top: 6px;
+  height: 24px;
+  border-radius: 99px;
+  border: 3px solid var(--ink);
+  background: rgba(10, 14, 28, 0.72);
+  overflow: hidden;
+}
+.legion-bar-fill {
+  position: absolute;
+  inset: 0 auto 0 0;
+  background: linear-gradient(#ff7a5c, #d2362f 55%, #9e1f1a);
+  transition: width 0.12s linear;
+}
+.legion-bar-name,
+.legion-bar-count {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 13px;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 1.5px 0 var(--ink), 1.5px 0 0 var(--ink), -1.5px 0 0 var(--ink), 0 -1.5px 0 var(--ink);
+}
+.legion-bar-name {
+  left: 10px;
+  text-transform: uppercase;
+}
+.legion-bar-count {
+  right: 10px;
+  font-variant-numeric: tabular-nums;
+}
+@media (prefers-reduced-motion: reduce) {
+  .legion-bar-fill {
+    transition: none;
+  }
+}
 /* the boss's health takes the place of the track: the red drops at once, the pale trail behind it a moment later */
 .boss-bar {
   position: relative;

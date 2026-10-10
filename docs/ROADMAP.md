@@ -19,6 +19,9 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [ ] Ouvir o som novo no celular e ajustar volume e timbre (os níveis foram acertados medindo arquivos gravados do motor de som: tiros a ~−18 dB de pico, música a ~−10 dB, explosões a ~−5 dB) — P
 
 **Depois: o jogo**
+- [ ] **Modo Cerco: decidir o que fazer com ele depois de jogar no celular** (virar modo no menu, ganhar fases e loja, ou ficar só como teste) e medir os quadros por segundo com a legião cheia na tela (o pior quadro tem ~370 mil triângulos) — P
+- [ ] Modo Cerco, se for adiante: calibração por simulação como a da campanha (hoje os números foram achados com dois bots, o ganancioso e o seguro), mais de uma fase, mais chefões e outros temas além do castelo — G 🎚️
+- [ ] Modo Cerco: o jogador não tem o que fazer enquanto a legião marcha, a não ser escolher o lugar. Pensar em decisões na luta (uma habilidade, uma faixa que aparece no meio, o chefão atacando) — M
 - [ ] Armas com efeito de verdade (cadência, perfuração, área) em vez de só dano por segundo — M 🎚️
 - [ ] Algumas fases de "Correria" e "Enxame" (8, 22, 38, 39, 44, 46) calibram no teto da pressão (16): nelas a pressão quase não muda o resultado, porque quem decide são os portais. Dá para dar ao gerador outra alavanca nessas fases (mais portais ruins, menos tempo entre eles) — M 🎚️
 - [ ] A fase mais dura do jogador bom no teste de estresse ainda varia muito de uma campanha para outra (de 9 a 19 tentativas): vale olhar as fases que passam de 15 — P 🎚️
@@ -39,6 +42,18 @@ Tamanho: P pequeno · M médio · G grande. 🎚️ = mexe nas regras, no gerado
 - [ ] Aviso de erros em produção (Sentry ou similar, plano grátis; conferir os limites antes) — P
 
 ## Feito
+
+**Modo Muralha (teste)**
+- [x] `?modo=muralha`: uma parede de pedra (com rachaduras e a vida escrita no pé) tranca a faixa amarela dos `+99`, com um muro baixo ao longo dela; quebrar a muralha a tempo é a decisão. Campeões laranja com clava e barra de vida saem da legião e vêm até o esquadrão
+- [x] Engine do Cerco estendida (`walls`, `champions`, `legion.wake`, `legion.speed`), 11 testes novos (29 no total) e a grade de números achada com os bots
+- [x] O esquadrão fica parado de verdade nos dois modos (câmera e ponte fixas; faixas, muralhas, legião e campeões vêm até ele), a legião encosta e mata sem parar, e as faixas continuam vindo durante a luta
+- [ ] Jogar os dois modos no celular e ajustar a dureza com o que o usuário achar (o botão é a frequência dos `+99` e o tamanho da legião) — P
+
+**Modo Cerco (teste)**
+- [x] `?modo=cerco`: ponte de castelo com tapete vermelho, muralha com ameias, torres e portão; uma legião de 5 mil soldados vermelhos marchando (desenhados um a um na frente e como placa de capacetes no resto) e um ogro no fim; faixas azuis `+1` (crescem com o tiro) contra faixas amarelas `+99` na outra faixa
+- [x] Engine própria (`siege.ts`) com 18 testes: faixas, tiro por faixa e tapete, marcha e contato, chefão só depois da legião, e o equilíbrio (o bot ganancioso vence, o seguro e o parado perdem)
+- [x] Bonecos novos e originais (cavaleiro arqueiro, legionário, ogro), com duas versões do cavaleiro por distância, na aba "cerco" da galeria
+- [x] Entrada só pela URL, sem botão no menu, sem moedas e sem tocar no save; a campanha e a calibração ficam como estavam
 
 **Fundação**
 - [x] Monorepo (Bun workspaces), engine pura e determinística, cliente React + Three.js

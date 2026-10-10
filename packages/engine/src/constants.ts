@@ -210,3 +210,71 @@ export const STRIKE_MAX_PASSES = 3;
 /** the middles of the safe corridors an air strike can leave, and how far the bombs fall from the middle of one (units) */
 export const STRIKE_CORRIDORS = [-2.4, 0, 2.4];
 export const STRIKE_CORRIDOR_REACH = 3.7;
+
+/**
+ * Siege mode (the castle bridge): a stone bridge with a red carpet down the middle and a lane of banners on each side.
+ * The bridge spans x in [-SIEGE_HALF_WIDTH, +SIEGE_HALF_WIDTH]; the carpet, where the legion marches, is
+ * x in [-SIEGE_CARPET_HALF, +SIEGE_CARPET_HALF] and the banner lanes are what is left either side of it (units).
+ */
+export const SIEGE_HALF_WIDTH = 5.2;
+export const SIEGE_CARPET_HALF = 2.4;
+/** how wide a banner is and how far from the middle of the road its middle is: it fills its lane (units) */
+export const SIEGE_BANNER_WIDTH = SIEGE_HALF_WIDTH - SIEGE_CARPET_HALF;
+export const SIEGE_BANNER_X = SIEGE_CARPET_HALF + SIEGE_BANNER_WIDTH / 2;
+/** the most a shot-up banner can say */
+export const SIEGE_BANNER_MAX = 99;
+/**
+ * The squad spreads into at most this many firing columns, this far apart (units): narrow enough to fit in a banner lane
+ * however many soldiers there are, so a big squad can still choose a lane
+ */
+export const SIEGE_MAX_COLUMNS = 5;
+export const SIEGE_COLUMN_SPACING = 0.55;
+
+/**
+ * The legion is one body of red soldiers, counted rather than simulated one by one: `LEGION_PER_ROW` across the
+ * carpet, `LEGION_ROW_SPACING` between rows (units). Each soldier has `LEGION_HP` hit points, and the squad's fire eats
+ * the legion from its front row. It sleeps until the squad is `LEGION_WAKE` away, then marches at `LEGION_SPEED` (units/s).
+ */
+export const LEGION_PER_ROW = 12;
+export const LEGION_ROW_SPACING = 0.42;
+export const LEGION_HP = 48;
+export const LEGION_SPEED = 4;
+export const LEGION_WAKE = 70;
+/**
+ * The squad never advances: the ground scrolls under it at `SIEGE_SCROLL_SPEED` (units/s), so the banners come at it down
+ * the lanes without stopping, and the legion marches at it on top of that. Whatever reaches it closer than
+ * `SIEGE_CONTACT` (units) is in contact and stays there, pinned to the squad, until it is dead
+ */
+export const SIEGE_SCROLL_SPEED = 3;
+export const SIEGE_CONTACT = 1.4;
+/** how many seconds of scrolling the road is built for (the camera follows the ground, so it must be long enough to last the fight) */
+export const SIEGE_ROAD_SECONDS = 260;
+/** soldiers a red soldier in contact kills per second */
+export const LEGION_KILL_RATE = 1.5;
+
+/** the boss walks behind the legion, this far from its last row (units), then alone at this speed (units/s); in contact it kills this many soldiers a second */
+export const SIEGE_BOSS_TAIL_GAP = 4;
+export const SIEGE_BOSS_SPEED = 1.2;
+export const SIEGE_BOSS_KILL_RATE = 8;
+/** half-width of the boss's body for the squad's columns (units) */
+export const SIEGE_BOSS_RADIUS = 2.2;
+
+/**
+ * Siege walls and champions (the wall mode): a block of stone across a banner lane, with the number of hit points
+ * shown at its foot in units of `SIEGE_HP_UNIT` hit points (so "800" is 8000 hit points). The squad cannot run
+ * through it: it stops `SIEGE_WALL_STOP` short of it and has to shoot it down.
+ */
+export const SIEGE_HP_UNIT = 10;
+export const SIEGE_WALL_STOP = 2.6;
+/** how deep a wall is, from its front face back (units): nobody slides sideways into it while passing it */
+export const SIEGE_WALL_DEPTH = 3;
+
+/**
+ * A champion is a big red fighter that walks out of the legion alone, with a health bar: speed (units/s), how fast it
+ * slides sideways after the squad (units/s), the width of its body for the columns that shoot it (units) and how many
+ * soldiers it kills each second in contact
+ */
+export const CHAMPION_SPEED = 3.2;
+export const CHAMPION_STEER = 2.2;
+export const CHAMPION_RADIUS = 0.9;
+export const CHAMPION_KILL_RATE = 9;
