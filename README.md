@@ -225,7 +225,9 @@ Atalhos na URL para testar:
 
 - `?bot=1`: o bot da engine joga a fase sozinho (aparece o selo 🤖 BOT);
 - `?galeria=1`: a galeria dos modelos (soldado, inimigos, chefões, armas, veículos, perigos); arraste para girar;
-- `?chefao=yeti`: a arena dos chefões, uma luta curta direto com o chefão (`general`, `warlord`, `mech`, `yeti` ou `demon`); a barra de baixo troca de chefão e alterna entre você e o bot.
+- `?chefao=yeti`: a arena dos chefões, uma luta curta direto com o chefão (`general`, `warlord`, `mech`, `yeti` ou `demon`); a barra de baixo troca de chefão e alterna entre você e o bot;
+- `?modo=cerco`: o modo de teste da ponte do castelo (um exército vermelho de milhares, faixas `+1` e `+99`, um ogro no fim); `&bot=1` deixa o bot jogar;
+- `?modo=muralha`: o outro modo de teste, com uma parede de pedra (com a vida no pé) trancando a faixa amarela dos `+99` e campeões que saem da legião; `&bot=1` também vale.
 
 | Comando | O que faz |
 |---|---|

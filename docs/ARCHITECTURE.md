@@ -175,3 +175,26 @@ A arena dos chefões (`?chefao=yeti`, `BossArena.tsx`) joga `bossArena(kind)` (`
 - `bun run typecheck` e `bun run build`.
 - PWA: `bun run build`, depois `cd apps/web && bunx vite preview --port 5185 --strictPort` e, num Chrome à parte, conferir que não há erro de instalação, recarregar sem rede e simular um deploy (mudar algo, gerar o build de novo e abrir duas vezes).
 - No navegador: `?bot=1` deixa o bot jogar para você olhar uma fase; `?galeria=1` mostra os modelos de perto. Confira sempre do ângulo da câmera do jogo, em tamanho de celular.
+
+## Modo Cerco (`?modo=cerco`)
+
+Um modo de teste que não passa pela campanha. A engine está toda em `packages/engine/src/siege.ts` (e os números em `constants.ts`, seção "Siege mode"); o cliente tem `game/SiegeGame.tsx` (laço, entrada e HUD), `game/siegeScene.ts` (a cena), `game/castle.ts` (ponte, tapete, muralha, torres, portão e as faixas), `game/siegeFigures.ts` (cavaleiro, legionário e ogro) e `game/siegeSfx.ts` (sons pela diferença entre dois estados, como na campanha).
+
+- **Pista:** de `-SIEGE_HALF_WIDTH` a `+SIEGE_HALF_WIDTH` (5,2). O tapete (`±SIEGE_CARPET_HALF`, 2,4) é da legião; o que sobra de cada lado é uma faixa de faixas de pontuação (`SiegeBanner`).
+- **Um tick (`stepSiege`):** o esquadrão desliza de lado e nunca avança: o chão passa por baixo dele a `SIEGE_SCROLL_SPEED` (`state.distance` é quanto o chão já passou) e só uma muralha na faixa dele para o chão. A legião acorda a `legion.wake` e marcha; ao encostar (`SIEGE_CONTACT`) fica **colada** no esquadrão, carregada pelo chão, e mata soldados sem parar até morrer. As fileiras de trás fecham o espaço dos que caem: a frente não recua. As faixas cruzadas somam (`+value`); cada coluna atira no primeiro que está nela (a legião no tapete, o chefão se a legião acabou, senão a faixa da sua faixa, que sobe com o dano). Vence quem derruba a legião e o chefão.
+- **Desenho:** a câmera e a ponte ficam fixas; o esquadrão está em `z = 0` da cena e todo o resto é desenhado a `z - distance` dele (`siegeScene.ts`). Assim as faixas, as muralhas, a legião, os campeões e o chefão **vêm** até o esquadrão, que fica em pose de tiro. As faixas são montadas ao entrar na vista e jogadas fora ao passar (`BANNER_VIEW`), porque a pista tem centenas.
+- **Chefão:** anda atrás da última fileira (`SIEGE_BOSS_TAIL_GAP`) enquanto a legião existe, e sozinho depois. Só leva tiro quando a legião acabou.
+- **Bot:** `siegeBotInput(state, skill)` escolhe a faixa com mais valor nos próximos 20 u (`SIEGE_SKILLED` aceita os `+99`, `SIEGE_SAFE` não) e vai para o tapete quando a luta começa.
+- **Cena:** `SiegeScene` tem a câmera mais alta e recuada que a da campanha, três `Crowd` (cavaleiros, legionários, o ogro) e uma placa de capacetes para o resto do exército. O cenário (`castle.ts`) é todo construído por código, com `InstancedMesh` nas ameias.
+- **Para mexer:** números em `constants.ts`; a fase de teste em `siegeLevel()`; o que o bot faz em `siegeBotInput`. Depois de mexer em regra ou número, `bun test packages/engine/test/siege.test.ts` mostra se a estratégia gananciosa ainda vence e a segura ainda perde.
+
+### Modo Muralha (`?modo=muralha`)
+
+O mesmo código do Cerco com duas peças a mais, ligadas pela fase (`wallSiegeLevel()`): `SiegeLevel.walls` e `SiegeLevel.champions`.
+
+- **Muralha (`SiegeWall`, `state.walls`):** tranca a faixa em `x`. `wallLimit` faz o chão parar quando a muralha chega a `SIEGE_WALL_STOP` do esquadrão (e as faixas atrás dela param junto); a muralha é alvo de `firstTarget` (a mais próxima entre ela e as faixas da mesma coluna); um muro lateral de `depth` unidades impede o esquadrão de deslizar para dentro da faixa quando já está ao lado dela. Com a vida zerada ela fica na lista (o desenho mostra os escombros).
+- **Campeão (`Champion`, `state.champions`):** nasce na frente da legião (`pendingChampions`), anda a `CHAMPION_SPEED`, segue o esquadrão de lado e corta soldados em contato. A frente que o esquadrão enfrenta (`frontZ`) é o mais próximo entre ele, a legião e o chefão. Vitória exige que todos tenham caído.
+- **Legião da fase:** `legion.wake` (a que distância o esquadrão a acorda) e `legion.speed` são da fase; o Cerco usa os padrões (`LEGION_WAKE`, `LEGION_SPEED`).
+- **Desenho:** `castle.ts` tem `buildWall`/`setWall` (bloco com rachaduras que aparecem conforme a vida cai, o número no pé, muro lateral baixo e escombros) e `siegeScene.ts` desenha os campeões (`brawlerFigure`, em `siegeFigures.ts`) com barra e número. O esquadrão não anda em nenhum dos dois modos: fica em pose de tiro, e a câmera e a ponte ficam fixas.
+- **Bot:** `siegeBotInput` só vai à muralha quando consegue quebrá-la bem antes do contato com a legião (`SIEGE_SKILLED.walls`), ignora faixas atrás de muralha de pé e as que ficam depois do ponto em que o esquadrão vai parar.
+
